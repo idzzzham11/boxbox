@@ -1,5 +1,7 @@
 using System.Globalization;
+using BoxBox.Api;
 using BoxBox.Core.Analytics;
+using BoxBox.Core.Contracts;
 using BoxBox.Core.Models;
 using BoxBox.Core.Validation;
 using Microsoft.EntityFrameworkCore;
@@ -33,8 +35,7 @@ using (var scope = app.Services.CreateScope())
     // (NOT NULL DEFAULT 0). It is ignored and inserts keep working through its default.
 }
 
-app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseBoxBoxStaticFiles(); // classic page at / and the Blazor app at /next/ (see StaticAssets.cs)
 
 static DateOnly TodayMy()
 {
@@ -168,9 +169,6 @@ public sealed class BoxBoxDb(DbContextOptions<BoxBoxDb> options) : DbContext(opt
     }
 }
 
-public sealed record NewEntry(DateOnly? Date, decimal AmountPaid, decimal? Litres, int? TripKm = null);
-/// <summary>Litres are the recorded ones, or estimated from the amount (LitresEstimated = true).</summary>
-public sealed record EntryDto(Guid Id, DateOnly Date, decimal AmountPaid, decimal? Litres, decimal? PricePerLitre, int? TripKm, bool LitresEstimated);
 public sealed class PriceConfig { public string From { get; set; } = ""; public decimal PerLitre { get; set; } }
 
 public partial class Program;

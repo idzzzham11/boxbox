@@ -1,0 +1,37 @@
+@inject BoxBoxApi Api
+
+<section class="card">
+    <details>
+        <summary>Import past amounts</summary>
+        <p class="empty">One per line: <code>date,amount[,litres[,trip km]]</code>. Dates as 2026-03-14 or 14/03/2026.</p>
+        <textarea @bind="csv" placeholder="2026-03-14,60&#10;2026-03-28,55.40,27.1"></textarea>
+        <button type="button" @onclick="Import" disabled="@busy">Import</button>
+        <div class="msg" role="status">@message</div>
+    </details>
+</section>
+
+@code {
+    private string csv = "";
+    private string? message;
+    private bool busy;
+
+    [Parameter] public EventCallback OnImported { get; set; }
+
+    private async Task Import()
+    {
+        busy = true;
+        try
+        {
+            var (count, errors) = await Api.ImportAsync(csv);
+            if (errors is null)
+            {
+                message = $"Imported {count} entries.";
+                csv = "";
+                await OnImported.InvokeAsync();
+            }
+            else message = string.Join(" ", errors.Take(5));
+        }
+        catch (HttpRequestException) { message = "Could not reach the server."; }
+        finally { busy = false; }
+    }
+}

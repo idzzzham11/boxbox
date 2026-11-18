@@ -1,0 +1,10 @@
+@* The smallest component: one big number with a label. [Parameter] properties are its inputs ("props"). *@
+<div class="stat">
+    <b>@Value</b>
+    <small>@Label</small>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+}

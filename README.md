@@ -148,6 +148,23 @@ curl -X POST http://localhost:PORT/api/import \
 | `GET` | `/api/forecast` | Next fill-up date / amount / litres and projected month spend |
 | `POST` | `/api/import` | CSV text import (see above) |
 
+## Two front ends
+
+- `/` is the original single-file HTML dashboard (`src/BoxBox.Api/wwwroot/index.html`, no build step).
+- `/next/` is the same dashboard written in Blazor WebAssembly (`src/BoxBox.Web`). It shares its request and
+  response types with the API through `BoxBox.Core`, and its components are tested with bUnit.
+
+To run the Blazor version locally, publish it into the API's `wwwroot/next` folder:
+
+```sh
+dotnet publish src/BoxBox.Web -c Release -o /tmp/boxbox-web
+mkdir -p src/BoxBox.Api/wwwroot/next && cp -r /tmp/boxbox-web/wwwroot/. src/BoxBox.Api/wwwroot/next/
+cd src/BoxBox.Api && dotnet run
+```
+
+Then open `/next/`. (`deploy/deploy.sh` does this for you; the copied folder is git-ignored.) The API serves
+the pre-compressed `.br`/`.gz` files Blazor publishes and caches the fingerprinted runtime files for a year.
+
 ## Hosting it
 
 BoxBox is one process serving both the API and the page, so any way of running a .NET app works.
@@ -168,7 +185,7 @@ BoxBox is one process serving both the API and the page, so any way of running a
 4. **Back up** the SQLite file regularly (copy it, or use `sqlite3 boxbox.db ".backup backup.db"`).
 
 [`deploy/deploy.sh`](deploy/deploy.sh) is an optional example script. It runs the tests, builds a
-release, uploads it to a Linux server over SSH, switches a `current` symlink, restarts the service,
+release (including the Blazor front end), uploads it to a Linux server over SSH, switches a `current` symlink, restarts the service,
 health-checks it and rolls back on failure. It never touches the database.
 
 ```sh
@@ -187,8 +204,10 @@ public internet until authentication is added.
 
 ```
 src/BoxBox.Core/   Domain models, validation and analytics (no database, easy to test)
-src/BoxBox.Api/    Minimal API, EF Core + SQLite, and the static dashboard (wwwroot/)
-tests/BoxBox.Tests xUnit tests
+src/BoxBox.Api/    Minimal API, EF Core + SQLite; serves both front ends
+src/BoxBox.Web/    Blazor WebAssembly front end (served at /next/)
+tests/BoxBox.Tests xUnit + bUnit tests
+docs/              LEARN-DOTNET.md, a guided tour of the code with exercises
 deploy/            Example systemd unit and deployment script
 ```
 
@@ -197,7 +216,7 @@ forecast). They are tested but not wired into the dashboard yet.
 
 ## Roadmap
 
-- Offline entry with sync when the connection returns
+- Offline entry with sync when the connection returns (service worker + local queue)
 - Consumption trend chart and anomaly hints
 - Optional login
 - Backup / restore and CSV export in the UI

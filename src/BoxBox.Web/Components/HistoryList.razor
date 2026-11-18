@@ -1,0 +1,46 @@
+@inject IJSRuntime JS
+
+<section class="card">
+    <h2>History</h2>
+    @if (Entries.Count == 0)
+    {
+        <div class="empty">Nothing yet. Add your first fill-up above.</div>
+    }
+    else
+    {
+        <ul>
+            @foreach (var e in Entries.Take(50))
+            {
+                <li @key="e.Id">
+                    <span class="d">@e.Date.ToString("yyyy-MM-dd")</span>
+                    <span class="a">
+                        @Fmt.Rm(e.AmountPaid)
+                        @if (e.Litres is { } l)
+                        {
+                            <small>· @(e.LitresEstimated ? "≈ " : "")@l.ToString("0.##") L@(e.LitresEstimated ? " est." : "") · @Fmt.Rm(e.PricePerLitre)/L</small>
+                        }
+                        @if (e.TripKm is { } km)
+                        {
+                            <small>· @km km</small>
+                        }
+                    </span>
+                    <button class="link" aria-label="Delete entry" @onclick="() => Delete(e.Id)">✕</button>
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<EntryDto> Entries { get; set; } = [];
+
+    // EventCallback is how a child tells its parent something happened (the opposite direction to [Parameter]).
+    [Parameter] public EventCallback<Guid> OnDelete { get; set; }
+
+    private async Task Delete(Guid id)
+    {
+        // JS interop: Blazor can call any browser JavaScript function. Here, the built-in confirm() dialog.
+        if (await JS.InvokeAsync<bool>("confirm", "Delete this entry?"))
+            await OnDelete.InvokeAsync(id);
+    }
+}

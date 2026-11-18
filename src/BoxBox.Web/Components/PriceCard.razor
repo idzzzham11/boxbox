@@ -1,0 +1,13 @@
+<section class="card">
+    <h2>Price</h2>
+    <div class="stats">
+        <Stat Value="@Fmt.Rm(Summary.ThisMonthSpent)" Label="This month" />
+        <Stat Value="@Fmt.Rm(Summary.LastMonthSpent)" Label="Last month" />
+        <Stat Value="@Fmt.Rm(Summary.AverageMonthlySpent)" Label="Avg / month" />
+        <Stat Value="@Fmt.Rm(Summary.TotalSpent)" Label="@($"Total · {Summary.EntryCount} fill-ups")" />
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public SpendSummaryResult Summary { get; set; } = default!;
+}

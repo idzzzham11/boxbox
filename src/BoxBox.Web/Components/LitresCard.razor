@@ -1,0 +1,25 @@
+<section class="card">
+    <h2>Litres</h2>
+    <div class="stats">
+        <Stat Value="@(Summary.TotalLitres is { } l ? Fmt.Litres(l) : "—")"
+              Label="@(Summary.EstimatedLitresEntries > 0 ? $"Total litres · {Summary.EstimatedLitresEntries} estimated" : "Total litres")" />
+        <Stat Value="@(Summary.AveragePricePerLitre is { } p ? Fmt.Rm(p) + "/L" : "—")" Label="Avg price per litre" />
+
+        @if (Summary.Economy is { SegmentCount: > 0 } e)
+        {
+            @* Razor lets C# and markup mix: this block only renders when there is economy data. *@
+            <Stat Value="@($"{Fmt.Num(e.AverageLitresPer100Km!.Value)} L/100km")" Label="@($"Avg economy · {Fmt.Num(e.AverageKmPerLitre!.Value, "0.0")} km/L")" />
+            <Stat Value="@($"{Fmt.Num(e.Last!.LitresPer100Km)} L/100km")" Label="Last fill-up" />
+            <Stat Value="@($"RM {Fmt.Num(e.AverageCostPerKm!.Value, "0.000")}/km")" Label="Avg cost per km" />
+            <Stat Value="@($"{e.TotalKm:N0} km")" Label="@($"Measured over {e.SegmentCount} {(e.SegmentCount == 1 ? "tank" : "tanks")}")" />
+        }
+        else
+        {
+            <div class="stat full"><small>Enter the trip-meter km on each fill-up (filled to the pump's cut-off) to see fuel economy.</small></div>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public SpendSummaryResult Summary { get; set; } = default!;
+}

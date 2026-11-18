@@ -1,0 +1,57 @@
+@page "/"
+@inject BoxBoxApi Api
+<PageTitle>BoxBox</PageTitle>
+
+@* The page owns the data and passes slices of it down to child components as parameters. *@
+@if (error is not null)
+{
+    <section class="card"><p class="msg">@error</p><button type="button" @onclick="Load">Try again</button></section>
+}
+else if (summary is null || entries is null || forecast is null)
+{
+    <p class="empty">Loading…</p>
+}
+else
+{
+    <PriceCard Summary="summary" />
+    <LitresCard Summary="summary" />
+    <AddEntryForm OnSaved="Load" />
+    <ForecastCard Forecast="forecast" />
+    <MonthBars Data="summary.Months" />
+    <HistoryList Entries="entries" OnDelete="Delete" />
+    <ImportBox OnImported="Load" />
+}
+
+@code {
+    private SpendSummaryResult? summary;
+    private List<EntryDto>? entries;
+    private ForecastResult? forecast;
+    private string? error;
+
+    // Lifecycle method: Blazor calls this once when the page first appears.
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        try
+        {
+            error = null;
+            // Start all three requests at once and wait for them together (faster than one after another).
+            var s = Api.GetSummaryAsync();
+            var e = Api.GetEntriesAsync();
+            var f = Api.GetForecastAsync();
+            await Task.WhenAll(s, e, f);
+            (summary, entries, forecast) = (s.Result, e.Result, f.Result);
+        }
+        catch (HttpRequestException)
+        {
+            error = "Could not reach the server. Is Tailscale on and the host awake?";
+        }
+    }
+
+    private async Task Delete(Guid id)
+    {
+        await Api.DeleteEntryAsync(id);
+        await Load();
+    }
+}

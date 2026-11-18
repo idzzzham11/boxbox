@@ -1,0 +1,72 @@
+@inject BoxBoxApi Api
+
+<section class="card">
+    <h2>Add fill-up</h2>
+    @* EditForm binds inputs to a C# object (Model) and validates it using the attributes on the class below. *@
+    <EditForm Model="model" OnValidSubmit="Save" FormName="add-entry" class="form">
+        <DataAnnotationsValidator />
+        <label>Paid (RM)
+            <InputNumber @bind-Value="model.Amount" inputmode="decimal" step="0.01" />
+        </label>
+        <label>Litres <small>(optional)</small>
+            <InputNumber @bind-Value="model.Litres" inputmode="decimal" step="0.01" placeholder="auto from RM" />
+        </label>
+        <label>Trip km since last fill
+            <InputNumber @bind-Value="model.TripKm" inputmode="numeric" step="1" placeholder="trip meter" />
+        </label>
+        <label>Date
+            <InputDate @bind-Value="model.Date" />
+        </label>
+        <button class="full" type="submit" disabled="@saving">@(saving ? "Saving…" : "Save")</button>
+        <div class="msg full" role="status">
+            <ValidationSummary />
+            @message
+        </div>
+    </EditForm>
+</section>
+
+@code {
+    private FormModel model = new();
+    private bool saving;
+    private string? message;
+
+    /// <summary>Raised after a successful save so the page can reload its data.</summary>
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    private async Task Save()
+    {
+        saving = true;
+        message = null;
+        try
+        {
+            var errors = await Api.AddEntryAsync(new NewEntry(model.Date, model.Amount!.Value, model.Litres, model.TripKm));
+            if (errors is null)
+            {
+                model = new FormModel();
+                await OnSaved.InvokeAsync();
+            }
+            else message = string.Join(" ", errors);
+        }
+        catch (HttpRequestException)
+        {
+            message = "Could not reach the server.";
+        }
+        finally { saving = false; }
+    }
+
+    /// <summary>The form's data, with the same rules the server enforces (the server still re-checks everything).</summary>
+    private sealed class FormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Enter the amount paid.")]
+        [System.ComponentModel.DataAnnotations.Range(0.01, 100000, ErrorMessage = "Amount must be greater than 0.")]
+        public decimal? Amount { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Range(0.01, 1000, ErrorMessage = "Litres must be greater than 0.")]
+        public decimal? Litres { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Range(1, 2000, ErrorMessage = "Trip km must be 1 to 2000.")]
+        public int? TripKm { get; set; }
+
+        public DateOnly? Date { get; set; }
+    }
+}
