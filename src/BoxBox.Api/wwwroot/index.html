@@ -25,6 +25,7 @@
   .stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .stat b { display:block; font-size:22px; font-variant-numeric:tabular-nums; }
   .stat small { color:var(--muted); }
+  .note { color:var(--muted); font-size:13px; margin:10px 0 0; }
   form { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   label { display:grid; gap:4px; font-size:13px; color:var(--muted); }
   input { font:inherit; padding:10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); width:100%; }
@@ -50,18 +51,23 @@
 <main>
   <h1>Box<span>Box</span></h1>
 
-  <section class="card stats" id="stats"></section>
+  <section class="card"><h2>Price</h2><div class="stats" id="priceStats"></div></section>
+
+  <section class="card"><h2>Litres</h2><div class="stats" id="litreStats"></div></section>
 
   <section class="card">
     <h2>Add fill-up</h2>
     <form id="form">
       <label>Paid (RM)<input name="amount" type="number" inputmode="decimal" step="0.01" min="0.01" required></label>
-      <label>Litres<input name="litres" type="number" inputmode="decimal" step="0.01" min="0.01" required></label>
-      <label class="full">Date<input name="date" type="date"></label>
+      <label>Litres <small>(optional)</small><input name="litres" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="auto from RM"></label>
+      <label>Trip km since last fill<input name="trip" type="number" inputmode="numeric" step="1" min="1" max="2000" placeholder="trip meter"></label>
+      <label>Date<input name="date" type="date"></label>
       <button class="full" type="submit">Save</button>
       <div class="msg full" id="msg" role="status"></div>
     </form>
   </section>
+
+  <section class="card"><h2>Forecast</h2><div class="stats" id="forecastStats"></div><p class="note" id="forecastNote"></p></section>
 
   <section class="card"><h2>Spending by month</h2><div class="bars" id="months"></div></section>
 
@@ -70,7 +76,7 @@
   <section class="card">
     <details>
       <summary>Import past amounts</summary>
-      <p class="empty">One per line: <code>date,amount</code> or <code>date,amount,litres</code>. Dates as 2026-03-14 or 14/03/2026.</p>
+      <p class="empty">One per line: <code>date,amount[,litres[,trip km]]</code>. Dates as 2026-03-14 or 14/03/2026.</p>
       <textarea id="csv" placeholder="2026-03-14,60&#10;2026-03-28,55.40,27.1"></textarea>
       <button id="import" type="button">Import</button>
       <div class="msg" id="importMsg" role="status"></div>
@@ -84,17 +90,57 @@ const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
+function econStats(e) {
+  if (!e || !e.segmentCount) return `<div class="stat full"><small>Enter litres and the trip-meter km on each fill-up (filled to the pump's cut-off) to see fuel economy.</small></div>`;
+  const stat = (v, label) => `<div class="stat"><b>${v}</b><small>${label}</small></div>`;
+  return stat(e.averageLitresPer100Km.toFixed(2) + ' L/100km', `Avg economy · ${e.averageKmPerLitre.toFixed(1)} km/L`) +
+         stat(e.last.litresPer100Km.toFixed(2) + ' L/100km', 'Last fill-up') +
+         stat('RM ' + e.averageCostPerKm.toFixed(3) + '/km', 'Avg cost per km') +
+         stat(e.totalKm.toLocaleString('en-MY') + ' km', `Measured over ${e.segmentCount} tank${e.segmentCount > 1 ? 's' : ''}`);
+}
+
+function renderForecast(f) {
+  const stat = (v, label) => `<div class="stat"><b>${v}</b><small>${label}</small></div>`;
+  if (!f.available) {
+    $('forecastStats').innerHTML = '';
+    $('forecastNote').textContent = f.reason || 'No forecast yet.';
+    return;
+  }
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const days = Math.round((new Date(f.nextDate + 'T00:00:00') - today) / 86400000);
+  const when = days <= 0 ? 'any day now' : days === 1 ? 'tomorrow' : `in ${days} days`;
+  const range = (s, fmt) => `${fmt(s.low)} – ${fmt(s.high)}`;
+  const l1 = n => n.toFixed(1) + ' L', money = n => 'RM ' + Math.round(n);
+
+  $('forecastStats').innerHTML =
+    stat(f.nextDate, `Next fill-up (${when}) · ${Math.round(f.intervalDays.low)}–${Math.round(f.intervalDays.high)} days apart`) +
+    stat('≈ ' + money(f.amount.predicted), `Next fill-up amount · ${range(f.amount, money)}`) +
+    (f.litres ? stat('≈ ' + l1(f.litres.predicted), `Next fill-up litres · ${range(f.litres, l1)}`) : '') +
+    stat(rm(f.projectedMonthSpend), 'Projected spend this month');
+
+  const better = [f.intervalDays, f.amount].every(x => x.beatsNaive);
+  $('forecastNote').textContent =
+    `${f.confidence} confidence: based on ${f.fillUps} fill-ups. Ranges are the typical error when each forecast model was tested on your past fill-ups. ` +
+    (better ? 'These models did better than just repeating your last fill-up. ' : 'Treat as a rough guide: at least one forecast was no better than repeating your last fill-up. ') +
+    (f.litresDerivedFromPrice ? 'Litres follow from the amount at the set price, so they add no new information. ' : '') +
+    'Forecasts improve as you add more fill-ups.';
+}
+
 async function load() {
-  const [s, entries] = await Promise.all([fetch('/api/summary').then(r => r.json()), fetch('/api/entries').then(r => r.json())]);
+  const [s, entries, f] = await Promise.all([fetch('/api/summary').then(r => r.json()), fetch('/api/entries').then(r => r.json()), fetch('/api/forecast').then(r => r.json())]);
+  renderForecast(f);
 
   const stat = (v, label) => `<div class="stat"><b>${v}</b><small>${label}</small></div>`;
-  $('stats').innerHTML =
+  $('priceStats').innerHTML =
     stat(rm(s.thisMonthSpent), 'This month') +
     stat(s.lastMonthSpent == null ? '—' : rm(s.lastMonthSpent), 'Last month') +
     stat(s.averageMonthlySpent == null ? '—' : rm(s.averageMonthlySpent), 'Avg / month') +
-    stat(s.averagePricePerLitre == null ? '—' : rm(s.averagePricePerLitre) + '/L', 'Avg price') +
-    stat(rm(s.totalSpent), `Total · ${s.entryCount} fill-ups`) +
-    stat(s.totalLitres == null ? '—' : Number(s.totalLitres).toFixed(1) + ' L', 'Litres recorded');
+    stat(rm(s.totalSpent), `Total · ${s.entryCount} fill-ups`);
+
+  $('litreStats').innerHTML =
+    stat(s.totalLitres == null ? '—' : Number(s.totalLitres).toFixed(1) + ' L', s.estimatedLitresEntries ? `Total litres · ${s.estimatedLitresEntries} estimated` : 'Total litres') +
+    stat(s.averagePricePerLitre == null ? '—' : rm(s.averagePricePerLitre) + '/L', 'Avg price per litre') +
+    econStats(s.economy);
 
   const recent = s.months.slice(-12), max = Math.max(1, ...recent.map(m => m.total));
   $('months').innerHTML = recent.length
@@ -102,14 +148,15 @@ async function load() {
     : '<div class="empty">No data yet.</div>';
 
   $('list').innerHTML = entries.length ? entries.slice(0, 50).map(e =>
-    `<li><span class="d">${e.date}</span><span class="a">${rm(e.amountPaid)}${e.litres ? ` <small>· ${e.litres} L · ${rm(e.pricePerLitre)}/L</small>` : ''}</span><button class="link" data-del="${e.id}" aria-label="Delete entry">✕</button></li>`).join('')
+    `<li><span class="d">${e.date}</span><span class="a">${rm(e.amountPaid)}${e.litres ? ` <small>· ${e.litresEstimated ? '≈ ' : ''}${e.litres} L${e.litresEstimated ? ' est.' : ''} · ${rm(e.pricePerLitre)}/L</small>` : ''}${e.tripKm ? ` <small>· ${e.tripKm} km</small>` : ''}</span><button class="link" data-del="${e.id}" aria-label="Delete entry">✕</button></li>`).join('')
     : '<div class="empty">Nothing yet. Add your first fill-up above.</div>';
 }
 
 $('form').addEventListener('submit', async ev => {
   ev.preventDefault();
   const f = new FormData(ev.target);
-  const body = { amountPaid: +f.get('amount'), litres: f.get('litres') ? +f.get('litres') : null, date: f.get('date') || null };
+  const body = { amountPaid: +f.get('amount'), litres: f.get('litres') ? +f.get('litres') : null,
+    tripKm: f.get('trip') ? +f.get('trip') : null, date: f.get('date') || null };
   const r = await fetch('/api/entries', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
   if (r.ok) { ev.target.reset(); $('msg').textContent = ''; load(); }
   else { const j = await r.json().catch(() => ({})); $('msg').textContent = (j.errors || ['Could not save.']).join(' '); }

@@ -12,10 +12,26 @@ var connection = builder.Configuration.GetConnectionString("BoxBox")
     ?? $"Data Source={Path.Combine(builder.Environment.ContentRootPath, "boxbox.db")}";
 builder.Services.AddDbContext<BoxBoxDb>(o => o.UseSqlite(connection));
 
+// Pump price used to estimate litres when only the amount paid is known (subsidised BUDI95 RON95 here).
+// Configure under FuelPrices:Budi95 in appsettings.json: one entry per price change, newest From wins.
+var prices = new FuelPriceSchedule(
+    (builder.Configuration.GetSection("FuelPrices:Budi95").Get<List<PriceConfig>>() ?? [])
+        .Where(p => DateOnly.TryParse(p.From, CultureInfo.InvariantCulture, out _))
+        .Select(p => new PricePeriod(DateOnly.Parse(p.From, CultureInfo.InvariantCulture), p.PerLitre)));
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
-    scope.ServiceProvider.GetRequiredService<BoxBoxDb>().Database.EnsureCreated();
+{
+    var db = scope.ServiceProvider.GetRequiredService<BoxBoxDb>();
+    db.Database.EnsureCreated();
+    // EnsureCreated never alters an existing table, so add columns introduced later (idempotent).
+    var cols = db.Database.SqlQueryRaw<string>("SELECT name AS Value FROM pragma_table_info('Entries')").ToList();
+    if (!cols.Contains("TripKm"))
+        db.Database.ExecuteSqlRaw("ALTER TABLE Entries ADD COLUMN TripKm INTEGER NULL");
+    // Note: databases that ran an intermediate build may still have an unused IsFullTank column
+    // (NOT NULL DEFAULT 0). It is ignored and inserts keep working through its default.
+}
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
@@ -26,24 +42,31 @@ static DateOnly TodayMy()
     return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTime.UtcNow, tz));
 }
 
-static FuelEntry ToCore(EntryRow r) => new(r.Id, r.VehicleId, r.Date, r.AmountPaid, r.Litres);
+EntryDto ToDto(FuelEntry e, FuelPriceSchedule schedule)
+{
+    var r = schedule.Resolve(e);
+    return new EntryDto(e.Id, e.Date, e.AmountPaid, r.Litres, r.PricePerLitre, e.TripKm, r.Estimated);
+}
+
+static FuelEntry ToCore(EntryRow r) => new(r.Id, r.VehicleId, r.Date, r.AmountPaid, r.Litres, r.TripKm);
 
 app.MapGet("/api/entries", async (BoxBoxDb db) =>
 {
     var rows = await db.Entries.OrderByDescending(e => e.Date).ThenByDescending(e => e.CreatedUtc).ToListAsync();
-    return rows.Select(r => new EntryDto(r.Id, r.Date, r.AmountPaid, r.Litres, ToCore(r).PricePerLitre));
+    return rows.Select(r => ToDto(ToCore(r), prices));
 });
 
 app.MapPost("/api/entries", async (NewEntry body, BoxBoxDb db) =>
 {
-    var entry = new FuelEntry(Guid.NewGuid(), DefaultVehicle, body.Date ?? TodayMy(), body.AmountPaid, body.Litres);
+    var entry = new FuelEntry(Guid.NewGuid(), DefaultVehicle, body.Date ?? TodayMy(), body.AmountPaid, body.Litres, body.TripKm);
     var errors = FuelEntryValidator.Validate(entry, TodayMy());
     if (errors.Count > 0) return Results.BadRequest(new { errors });
 
     db.Entries.Add(new EntryRow { Id = entry.Id, VehicleId = entry.VehicleId, Date = entry.Date,
-        AmountPaid = entry.AmountPaid, Litres = entry.Litres, CreatedUtc = DateTime.UtcNow });
+        AmountPaid = entry.AmountPaid, Litres = entry.Litres, TripKm = entry.TripKm,
+        CreatedUtc = DateTime.UtcNow });
     await db.SaveChangesAsync();
-    return Results.Created($"/api/entries/{entry.Id}", new EntryDto(entry.Id, entry.Date, entry.AmountPaid, entry.Litres, entry.PricePerLitre));
+    return Results.Created($"/api/entries/{entry.Id}", ToDto(entry, prices));
 });
 
 app.MapDelete("/api/entries/{id:guid}", async (Guid id, BoxBoxDb db) =>
@@ -56,9 +79,13 @@ app.MapDelete("/api/entries/{id:guid}", async (Guid id, BoxBoxDb db) =>
 });
 
 app.MapGet("/api/summary", async (BoxBoxDb db) =>
-    SpendSummary.Compute((await db.Entries.ToListAsync()).Select(ToCore), TodayMy()));
+    SpendSummary.Compute((await db.Entries.OrderBy(e => e.Date).ThenBy(e => e.CreatedUtc).ToListAsync()).Select(ToCore), TodayMy(), prices));
 
-// CSV import: one row per line "date,amount[,litres]" (date as yyyy-MM-dd or dd/MM/yyyy).
+app.MapGet("/api/forecast", async (BoxBoxDb db) =>
+    SpendForecaster.Compute((await db.Entries.OrderBy(e => e.Date).ThenBy(e => e.CreatedUtc).ToListAsync()).Select(ToCore), TodayMy(), prices));
+
+// CSV import: one row per line "date,amount[,litres[,tripKm]]" (date as yyyy-MM-dd or dd/MM/yyyy).
+// Rows are stored in file order, which matters for same-day fills.
 // A header line and blank lines are skipped. All-or-nothing: any bad line rejects the whole file.
 app.MapPost("/api/import", async (HttpRequest req, BoxBoxDb db) =>
 {
@@ -80,7 +107,7 @@ app.MapPost("/api/import", async (HttpRequest req, BoxBoxDb db) =>
         if (!DateOnly.TryParseExact(parts[0], ["yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy"], CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
             || parts.Length < 2
             || !decimal.TryParse(parts[1], NumberStyles.Number, CultureInfo.InvariantCulture, out var amount))
-        { errors.Add($"Line {lineNo}: expected date,amount[,litres]"); continue; }
+        { errors.Add($"Line {lineNo}: expected date,amount[,litres[,tripKm]]"); continue; }
 
         decimal? litres = null;
         if (parts.Length > 2 && parts[2].Length > 0)
@@ -90,10 +117,19 @@ app.MapPost("/api/import", async (HttpRequest req, BoxBoxDb db) =>
             litres = l;
         }
 
-        var entry = new FuelEntry(Guid.NewGuid(), DefaultVehicle, date, amount, litres);
+        int? tripKm = null;
+        if (parts.Length > 3 && parts[3].Length > 0)
+        {
+            if (!int.TryParse(parts[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out var t))
+            { errors.Add($"Line {lineNo}: trip km is not a whole number"); continue; }
+            tripKm = t;
+        }
+
+        var entry = new FuelEntry(Guid.NewGuid(), DefaultVehicle, date, amount, litres, tripKm);
         var problems = FuelEntryValidator.Validate(entry, today);
         if (problems.Count > 0) { errors.AddRange(problems.Select(p => $"Line {lineNo}: {p}")); continue; }
-        parsed.Add(new EntryRow { Id = entry.Id, VehicleId = entry.VehicleId, Date = date, AmountPaid = amount, Litres = litres, CreatedUtc = DateTime.UtcNow });
+        parsed.Add(new EntryRow { Id = entry.Id, VehicleId = entry.VehicleId, Date = date, AmountPaid = amount, Litres = litres, TripKm = tripKm,
+            CreatedUtc = DateTime.UtcNow.AddTicks(parsed.Count) });
     }
 
     if (errors.Count > 0) return Results.BadRequest(new { errors });
@@ -111,6 +147,7 @@ public sealed class EntryRow
     public DateOnly Date { get; set; }
     public decimal AmountPaid { get; set; }
     public decimal? Litres { get; set; }
+    public int? TripKm { get; set; }
     public DateTime CreatedUtc { get; set; }
 }
 
@@ -131,7 +168,9 @@ public sealed class BoxBoxDb(DbContextOptions<BoxBoxDb> options) : DbContext(opt
     }
 }
 
-public sealed record NewEntry(DateOnly? Date, decimal AmountPaid, decimal? Litres);
-public sealed record EntryDto(Guid Id, DateOnly Date, decimal AmountPaid, decimal? Litres, decimal? PricePerLitre);
+public sealed record NewEntry(DateOnly? Date, decimal AmountPaid, decimal? Litres, int? TripKm = null);
+/// <summary>Litres are the recorded ones, or estimated from the amount (LitresEstimated = true).</summary>
+public sealed record EntryDto(Guid Id, DateOnly Date, decimal AmountPaid, decimal? Litres, decimal? PricePerLitre, int? TripKm, bool LitresEstimated);
+public sealed class PriceConfig { public string From { get; set; } = ""; public decimal PerLitre { get; set; } }
 
 public partial class Program;

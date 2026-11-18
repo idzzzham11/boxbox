@@ -12,12 +12,15 @@ public sealed record SpendSummaryResult(
     decimal? AverageMonthlySpent,
     decimal? AveragePricePerLitre,
     decimal? TotalLitres,
-    IReadOnlyList<MonthSpend> Months);
+    int EstimatedLitresEntries,
+    IReadOnlyList<MonthSpend> Months,
+    FuelEconomyResult Economy);
 
 public static class SpendSummary
 {
-    public static SpendSummaryResult Compute(IEnumerable<FuelEntry> entries, DateOnly today)
+    public static SpendSummaryResult Compute(IEnumerable<FuelEntry> entries, DateOnly today, FuelPriceSchedule? prices = null)
     {
+        prices ??= FuelPriceSchedule.Empty;
         var list = entries.ToList();
 
         var months = list
@@ -34,17 +37,21 @@ public static class SpendSummary
         var completed = months.Where(m => (m.Year, m.Month) != (today.Year, today.Month)).ToList();
         decimal? avgMonthly = completed.Count > 0 ? Math.Round(completed.Average(m => m.Total), 2) : null;
 
-        // Price per litre / total litres use only entries that recorded litres.
-        var withLitres = list.Where(e => e.Litres is > 0).ToList();
-        decimal? avgPrice = null, totalLitres = null;
-        if (withLitres.Count > 0)
-        {
-            totalLitres = withLitres.Sum(e => e.Litres!.Value);
-            avgPrice = Math.Round(withLitres.Sum(e => e.AmountPaid) / totalLitres.Value, 3);
-        }
+        // Average price uses only litres that were really recorded (receipts); estimated litres are
+        // derived from a price, so using them here would be circular.
+        var recorded = list.Where(e => e.Litres is > 0).ToList();
+        decimal? avgPrice = recorded.Count > 0
+            ? Math.Round(recorded.Sum(e => e.AmountPaid) / recorded.Sum(e => e.Litres!.Value), 3)
+            : null;
+
+        // Total litres = recorded + estimated (estimated from the amount paid and the scheduled price).
+        var resolved = list.Select(prices.Resolve).Where(r => r.Litres is > 0).ToList();
+        decimal? totalLitres = resolved.Count > 0 ? resolved.Sum(r => r.Litres!.Value) : null;
+        var estimatedCount = resolved.Count(r => r.Estimated);
 
         return new SpendSummaryResult(
             list.Sum(e => e.AmountPaid), list.Count, thisMonth, lastMonth,
-            avgMonthly, avgPrice, totalLitres, months);
+            avgMonthly, avgPrice, totalLitres, estimatedCount, months,
+            FuelEconomy.Compute(list, prices));
     }
 }
