@@ -46,7 +46,6 @@
   .chart .line { fill:none; stroke:var(--accent); stroke-width:2; stroke-linejoin:round; stroke-linecap:round; }
   .chart .dot { fill:var(--accent); }
   .chart text { fill:var(--muted); font-size:10px; font-variant-numeric:tabular-nums; }
-  .chart text.latest { fill:var(--ink); font-weight:600; }
 
   .fab { position:fixed; right:16px; bottom:calc(16px + env(safe-area-inset-bottom)); z-index:10; padding:14px 20px; border-radius:999px;
          box-shadow:0 4px 14px rgba(0,0,0,.3); font-size:16px; }

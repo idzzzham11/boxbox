@@ -41,8 +41,6 @@
             </circle>
         }
 
-        @* Label the newest value, nudged left if it would run off the right edge. *@
-        <SvgLabel Class="latest" X="@F(Math.Min(X(points[^1]), plotRight - 14))" Y="@F(Y(points[^1].Value) - 8)" Anchor="middle" Text="@Format(points[^1].Value)" />
 
         <SvgLabel X="@F(plotLeft)" Y="@F(Height - 6)" Anchor="start" Text="@first.ToString("d MMM", CultureInfo.InvariantCulture)" />
         @if (last != first)
@@ -58,7 +56,7 @@
 
     [Parameter, EditorRequired] public IReadOnlyList<ChartPoint> Points { get; set; } = [];
 
-    /// <summary>How axis labels and the latest value are written, e.g. "RM 60" or "7.5".</summary>
+    /// <summary>How the y-axis labels are written, e.g. "RM 60" or "7.5".</summary>
     [Parameter] public Func<double, string> Format { get; set; } = v => v.ToString("0.##", CultureInfo.InvariantCulture);
 
     /// <summary>Optional dashed horizontal reference line, such as the overall average.</summary>

@@ -128,7 +128,7 @@ public class ChartComponentTests : BunitContext
     }
 
     [Fact]
-    public void Average_line_and_tooltips_and_latest_value_are_drawn()
+    public void Average_line_and_tooltips_are_drawn_but_dots_carry_no_value_label()
     {
         var cut = Render<LineChart>(p => p
             .Add(x => x.Points, [P("2026-11-01", 7.0), P("2026-11-09", 8.6)])
@@ -137,7 +137,7 @@ public class ChartComponentTests : BunitContext
             .Add(x => x.AriaLabel, "x"));
         Assert.Single(cut.FindAll("line.avg"));
         Assert.Contains("2026-11-09 · 8.6", cut.Markup);   // tooltip (<title>) of the latest point
-        Assert.Contains("8.6", cut.Find("text.latest").TextContent);
+        Assert.Empty(cut.FindAll("text.latest"));                // no value printed beside the newest dot
     }
 
     [Fact]
