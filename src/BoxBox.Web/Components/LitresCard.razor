@@ -1,7 +1,7 @@
 <section class="card">
     <h2>Litres</h2>
     <div class="stats">
-        @* The same four figures as the Price card, in litres. "≈" marks figures that include estimated litres. *@
+        @* The same four figures as the Price card, in litres. *@
         <Stat Value="@Litres(Summary.ThisMonthLitres)" Label="This month" />
         <Stat Value="@Litres(Summary.LastMonthLitres)" Label="Last month" />
         <Stat Value="@Litres(Summary.AverageMonthlyLitres)" Label="Avg / month" />
@@ -34,9 +34,7 @@
 
     [Parameter, EditorRequired] public SpendSummaryResult Summary { get; set; } = default!;
 
-    // Some litres come from the amount paid at the set price, so say so with a leading "≈" instead of a paragraph.
-    private string Litres(decimal? value) =>
-        value is null ? "—" : (Summary.EstimatedLitresEntries > 0 ? "≈ " : "") + Fmt.Litres(value.Value);
+    private static string Litres(decimal? value) => value is null ? "—" : Fmt.Litres(value.Value);
 
     private IReadOnlyList<ChartPoint> EconomyPoints =>
         (Summary.Economy?.Segments ?? [])

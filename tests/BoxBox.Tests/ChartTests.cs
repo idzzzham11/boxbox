@@ -242,7 +242,7 @@ public class ChartComponentTests : BunitContext
     }
 
     [Fact]
-    public void Litre_figures_carry_an_approx_sign_when_they_include_estimates_and_no_paragraph()
+    public void Litre_figures_are_plain_numbers_even_when_they_include_estimates()
     {
         var summary = SpendSummary.Compute([
             new FuelEntry(Guid.NewGuid(), TestData.Car, new DateOnly(2026, 10, 10), 50m),         // estimated
@@ -250,13 +250,13 @@ public class ChartComponentTests : BunitContext
             Today, Budi);
         var cut = Render<LitresCard>(p => p.Add(x => x.Summary, summary));
         var stats = StatValues(cut);
-        Assert.Contains(stats, s => s.StartsWith("≈ ") && s.Contains("Total litres"));
-        Assert.Contains(stats, s => s.StartsWith("≈ ") && s.Contains("This month"));
+        Assert.Contains(stats, s => s.StartsWith("53.1 L") && s.Contains("Total litres"));   // 25.13 estimated + 28 recorded, as a plain number
+        Assert.DoesNotContain("≈", cut.Markup);
         Assert.Empty(cut.FindAll("p"));                   // minimalist: no explanatory text
     }
 
     [Fact]
-    public void Litre_figures_have_no_approx_sign_when_every_litre_was_recorded()
+    public void Litre_figures_stay_plain_when_every_litre_was_recorded()
     {
         var summary = SpendSummary.Compute([
             new FuelEntry(Guid.NewGuid(), TestData.Car, new DateOnly(2026, 10, 10), 60m, 30m),

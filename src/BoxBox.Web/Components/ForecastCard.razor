@@ -10,7 +10,7 @@
         @* The confidence stays visible as a few quiet words, because a forecast from a handful of fill-ups is a guess. *@
         <h2>Forecast <span class="quiet">· @Forecast.Confidence.ToLowerInvariant() confidence</span></h2>
         <div class="stats">
-            <Stat Value="@Forecast.NextDate.Value.ToString("yyyy-MM-dd")"
+            <Stat Value="@Forecast.NextDate.Value.ToString("d MMM", System.Globalization.CultureInfo.InvariantCulture)"
                   Label="@($"Next fill-up · {when}")" />
             <Stat Value="@("≈ " + Fmt.RmShort(amount.Predicted))"
                   Label="@($"Amount · {Fmt.RmShort(amount.Low)} – {Fmt.RmShort(amount.High)}")" />

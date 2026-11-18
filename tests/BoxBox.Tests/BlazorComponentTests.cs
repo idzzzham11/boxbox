@@ -89,7 +89,7 @@ public class BlazorComponentTests : BunitContext
         Assert.True(cut.FindAll("svg.chart").Count >= 1);
         Assert.Contains("<h2>History</h2>", text);
         Assert.Contains("12 fill-ups", text);                  // total card
-        Assert.Contains("≈", cut.Find("section.card:nth-of-type(3)").InnerHtml);   // Litres card: estimated litres are marked
+        Assert.DoesNotContain("≈", cut.Find("section.card:nth-of-type(3)").InnerHtml);   // Litres card: no approx sign
         Assert.Contains("low confidence", text);                                    // quiet confidence note in the Forecast heading
     }
 
@@ -141,6 +141,16 @@ public class BlazorComponentTests : BunitContext
         Assert.Contains("low confidence", cut.Find("h2").TextContent);
         Assert.Equal(4, cut.FindAll(".stat").Count);
         Assert.Empty(cut.FindAll("p"));                   // minimalist: no explanatory text
+    }
+
+    [Fact]
+    public void Forecast_date_is_shown_as_day_and_month_name()
+    {
+        var f = SpendForecaster.Compute(Sample(), Today, Budi);
+        var cut = Render<ForecastCard>(p => p.Add(x => x.Forecast, f));
+        var first = cut.Find(".stat b").TextContent.Trim();
+        Assert.Equal(f.NextDate!.Value.ToString("d MMM", System.Globalization.CultureInfo.InvariantCulture), first);
+        Assert.Matches(@"^\d{1,2} [A-Z][a-z]{2}$", first);   // e.g. 22 Nov, no year
     }
 
     [Fact]
