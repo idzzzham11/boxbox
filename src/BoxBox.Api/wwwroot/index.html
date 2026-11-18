@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BoxBox</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#d9322b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BoxBox">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/icon-192.png">
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#15181d; --muted:#6a7280; --line:#e3e6ea; --accent:#d9322b; --bar:#d9322b33; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#111317; --card:#1a1d23; --ink:#eceef1; --muted:#98a0ad; --line:#2a2e36; --accent:#ff5a52; --bar:#ff5a5240; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.4 system-ui,sans-serif; }
+  main { max-width:640px; margin:0 auto; padding:16px; display:grid; gap:14px; }
+  h1 { font-size:20px; margin:0; } h1 span { color:var(--accent); }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 10px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; }
+  .stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .stat b { display:block; font-size:22px; font-variant-numeric:tabular-nums; }
+  .stat small { color:var(--muted); }
+  form { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  label { display:grid; gap:4px; font-size:13px; color:var(--muted); }
+  input { font:inherit; padding:10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); width:100%; }
+  .full { grid-column:1/-1; }
+  button { font:inherit; padding:11px; border:0; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
+  button.link { background:none; color:var(--muted); padding:4px 8px; font-weight:400; }
+  .msg { font-size:14px; min-height:1.2em; color:var(--accent); }
+  .bars { display:grid; gap:6px; }
+  .bar { display:grid; grid-template-columns:64px 1fr 72px; gap:8px; align-items:center; font-size:13px; font-variant-numeric:tabular-nums; }
+  .bar i { display:block; height:16px; background:var(--accent); border-radius:4px; min-width:2px; }
+  .bar span:last-child { text-align:right; }
+  ul { list-style:none; margin:0; padding:0; }
+  li { display:flex; align-items:center; gap:8px; padding:9px 0; border-top:1px solid var(--line); }
+  li:first-child { border-top:0; }
+  li .d { color:var(--muted); width:92px; font-size:14px; } li .a { flex:1; font-variant-numeric:tabular-nums; }
+  li .a small { color:var(--muted); }
+  .empty { color:var(--muted); font-size:14px; }
+  details summary { cursor:pointer; color:var(--muted); font-size:14px; }
+  textarea { width:100%; min-height:110px; font:13px ui-monospace,monospace; padding:10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); margin:10px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Box<span>Box</span></h1>
+
+  <section class="card stats" id="stats"></section>
+
+  <section class="card">
+    <h2>Add fill-up</h2>
+    <form id="form">
+      <label>Paid (RM)<input name="amount" type="number" inputmode="decimal" step="0.01" min="0.01" required></label>
+      <label>Litres<input name="litres" type="number" inputmode="decimal" step="0.01" min="0.01" required></label>
+      <label class="full">Date<input name="date" type="date"></label>
+      <button class="full" type="submit">Save</button>
+      <div class="msg full" id="msg" role="status"></div>
+    </form>
+  </section>
+
+  <section class="card"><h2>Spending by month</h2><div class="bars" id="months"></div></section>
+
+  <section class="card"><h2>History</h2><ul id="list"></ul></section>
+
+  <section class="card">
+    <details>
+      <summary>Import past amounts</summary>
+      <p class="empty">One per line: <code>date,amount</code> or <code>date,amount,litres</code>. Dates as 2026-03-14 or 14/03/2026.</p>
+      <textarea id="csv" placeholder="2026-03-14,60&#10;2026-03-28,55.40,27.1"></textarea>
+      <button id="import" type="button">Import</button>
+      <div class="msg" id="importMsg" role="status"></div>
+    </details>
+  </section>
+</main>
+
+<script>
+const rm = n => 'RM ' + Number(n).toLocaleString('en-MY', {minimumFractionDigits:2, maximumFractionDigits:2});
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function load() {
+  const [s, entries] = await Promise.all([fetch('/api/summary').then(r => r.json()), fetch('/api/entries').then(r => r.json())]);
+
+  const stat = (v, label) => `<div class="stat"><b>${v}</b><small>${label}</small></div>`;
+  $('stats').innerHTML =
+    stat(rm(s.thisMonthSpent), 'This month') +
+    stat(s.lastMonthSpent == null ? '—' : rm(s.lastMonthSpent), 'Last month') +
+    stat(s.averageMonthlySpent == null ? '—' : rm(s.averageMonthlySpent), 'Avg / month') +
+    stat(s.averagePricePerLitre == null ? '—' : rm(s.averagePricePerLitre) + '/L', 'Avg price') +
+    stat(rm(s.totalSpent), `Total · ${s.entryCount} fill-ups`) +
+    stat(s.totalLitres == null ? '—' : Number(s.totalLitres).toFixed(1) + ' L', 'Litres recorded');
+
+  const recent = s.months.slice(-12), max = Math.max(1, ...recent.map(m => m.total));
+  $('months').innerHTML = recent.length
+    ? recent.slice().reverse().map(m => `<div class="bar"><span>${MON[m.month-1]} ${String(m.year).slice(2)}</span><i style="width:${(m.total/max*100).toFixed(1)}%"></i><span>${rm(m.total)}</span></div>`).join('')
+    : '<div class="empty">No data yet.</div>';
+
+  $('list').innerHTML = entries.length ? entries.slice(0, 50).map(e =>
+    `<li><span class="d">${e.date}</span><span class="a">${rm(e.amountPaid)}${e.litres ? ` <small>· ${e.litres} L · ${rm(e.pricePerLitre)}/L</small>` : ''}</span><button class="link" data-del="${e.id}" aria-label="Delete entry">✕</button></li>`).join('')
+    : '<div class="empty">Nothing yet. Add your first fill-up above.</div>';
+}
+
+$('form').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const f = new FormData(ev.target);
+  const body = { amountPaid: +f.get('amount'), litres: f.get('litres') ? +f.get('litres') : null, date: f.get('date') || null };
+  const r = await fetch('/api/entries', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  if (r.ok) { ev.target.reset(); $('msg').textContent = ''; load(); }
+  else { const j = await r.json().catch(() => ({})); $('msg').textContent = (j.errors || ['Could not save.']).join(' '); }
+});
+
+$('list').addEventListener('click', async ev => {
+  const id = ev.target.dataset.del;
+  if (id && confirm('Delete this entry?')) { await fetch('/api/entries/' + id, { method:'DELETE' }); load(); }
+});
+
+$('import').addEventListener('click', async () => {
+  const r = await fetch('/api/import', { method:'POST', headers:{'Content-Type':'text/plain'}, body: $('csv').value });
+  const j = await r.json().catch(() => ({}));
+  if (r.ok) { $('importMsg').textContent = `Imported ${j.imported} entries.`; $('csv').value = ''; load(); }
+  else $('importMsg').textContent = (j.errors || ['Import failed.']).slice(0, 5).join(' ');
+});
+
+load();
+</script>
+</body>
+</html>

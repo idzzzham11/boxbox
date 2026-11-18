@@ -1,0 +1,14 @@
+bin/
+obj/
+*.db
+*.db-shm
+*.db-wal
+.vs/
+.idea/
+*.user
+TestResults/
+
+# Private / environment-specific notes (kept locally, not published)
+HANDOFF.md
+deploy/HOST.md
+.claude/

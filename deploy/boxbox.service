@@ -1,0 +1,17 @@
+[Unit]
+Description=BoxBox fuel tracker
+After=network-online.target
+
+[Service]
+WorkingDirectory=/opt/boxbox/current
+ExecStart=/opt/boxbox/current/BoxBox.Api
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5080
+Environment=ASPNETCORE_ENVIRONMENT=Production
+# Quoted: systemd splits unquoted Environment= values on spaces, which truncated
+# the connection string to "Data" and crashed EnsureCreated() at startup.
+Environment="ConnectionStrings__BoxBox=Data Source=/var/lib/boxbox/boxbox.db"
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

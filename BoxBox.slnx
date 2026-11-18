@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BoxBox.Api/BoxBox.Api.csproj" />
+    <Project Path="src/BoxBox.Core/BoxBox.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BoxBox.Tests/BoxBox.Tests.csproj" />
+  </Folder>
+</Solution>
