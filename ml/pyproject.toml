@@ -1,0 +1,18 @@
+[project]
+name = "boxbox-ml"
+version = "0.1.0"
+description = "Forecasting experiments for BoxBox: backtested models for fill-up timing and spend"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "statsmodels",
+    "scipy",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
