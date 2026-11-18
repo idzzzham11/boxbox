@@ -9,8 +9,8 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");              // mount the root component on <div id="app">
 builder.RootComponents.Add<HeadOutlet>("head::after"); // lets components set <title> etc.
 
-// The web app is served from /next/ but the API lives at /api/ on the same origin, so point the
-// HttpClient at the origin root (scheme + host), not at the /next/ base address.
+// The web app and the API are served from the same origin, so point the HttpClient at the origin root
+// (scheme + host). Calls like "api/summary" then resolve to https://host/api/summary.
 var origin = new Uri(new Uri(builder.HostEnvironment.BaseAddress).GetLeftPart(UriPartial.Authority));
 builder.Services.AddScoped(_ => new HttpClient { BaseAddress = origin });
 

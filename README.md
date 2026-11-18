@@ -35,12 +35,13 @@ one SQLite file that you own.
 
 ```sh
 git clone https://github.com/idzzzham11/boxbox.git
-cd boxbox/src/BoxBox.Api
-dotnet run
+cd boxbox
+./scripts/run-local.sh
 ```
 
-Open the URL printed in the console (look for `Now listening on:`). A `boxbox.db` file is
-created next to the app on first run.
+Open http://localhost:5080. This builds the API and the Blazor front end together and keeps your data in
+`local-data/boxbox.db`. To run just the API (JSON endpoints and the `/classic/` page, no Blazor app) use
+`dotnet run` in `src/BoxBox.Api`.
 
 Run the tests from the repository root:
 
@@ -148,22 +149,23 @@ curl -X POST http://localhost:PORT/api/import \
 | `GET` | `/api/forecast` | Next fill-up date / amount / litres and projected month spend |
 | `POST` | `/api/import` | CSV text import (see above) |
 
-## Two front ends
+## Front ends
 
-- `/` is the original single-file HTML dashboard (`src/BoxBox.Api/wwwroot/index.html`, no build step).
-- `/next/` is the same dashboard written in Blazor WebAssembly (`src/BoxBox.Web`). It shares its request and
-  response types with the API through `BoxBox.Core`, and its components are tested with bUnit.
+- `/` is the main app, written in **Blazor WebAssembly** (`src/BoxBox.Web`). It shares its request and response
+  types with the API through `BoxBox.Core`, and its components are tested with bUnit.
+- `/classic/` is the original single-file HTML dashboard (`src/BoxBox.Api/wwwroot/classic/index.html`, no build
+  step). It uses the same API and database, and is kept as a lightweight fallback.
 
-To run the Blazor version locally, publish it into the API's `wwwroot/next` folder:
+The Blazor files are not in the API project's source folder. They are built and combined with the API when you
+publish, so to try everything locally use the helper script:
 
 ```sh
-dotnet publish src/BoxBox.Web -c Release -o /tmp/boxbox-web
-mkdir -p src/BoxBox.Api/wwwroot/next && cp -r /tmp/boxbox-web/wwwroot/. src/BoxBox.Api/wwwroot/next/
-cd src/BoxBox.Api && dotnet run
+./scripts/run-local.sh          # builds both, serves on http://localhost:5080, data in ./local-data/
 ```
 
-Then open `/next/`. (`deploy/deploy.sh` does this for you; the copied folder is git-ignored.) The API serves
-the pre-compressed `.br`/`.gz` files Blazor publishes and caches the fingerprinted runtime files for a year.
+(`deploy/deploy.sh` does the same combination for a server.) The API serves the pre-compressed `.br`/`.gz` files
+Blazor publishes and caches the fingerprinted runtime files for a year, so a phone downloads the runtime once.
+The first load is a few MB; later loads are fast.
 
 ## Hosting it
 
@@ -205,7 +207,7 @@ public internet until authentication is added.
 ```
 src/BoxBox.Core/   Domain models, validation and analytics (no database, easy to test)
 src/BoxBox.Api/    Minimal API, EF Core + SQLite; serves both front ends
-src/BoxBox.Web/    Blazor WebAssembly front end (served at /next/)
+src/BoxBox.Web/    Blazor WebAssembly front end (the main app at /)
 tests/BoxBox.Tests xUnit + bUnit tests
 docs/              LEARN-DOTNET.md, a guided tour of the code with exercises
 deploy/            Example systemd unit and deployment script

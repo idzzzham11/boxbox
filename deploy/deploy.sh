@@ -17,11 +17,10 @@ echo "==> Publish ($ARCH, self-contained)"
 dotnet publish "$ROOT/src/BoxBox.Api" -c Release -r "$ARCH" --self-contained -o "$OUT/app" --nologo -v q
 
 # The Blazor WebAssembly front end runs in the browser, so it is not tied to the server's CPU architecture.
-# Its output is served by the API under /next/.
+# Its published files are copied into the API's wwwroot and served from "/".
 echo "==> Publish web app (Blazor WebAssembly)"
 dotnet publish "$ROOT/src/BoxBox.Web" -c Release -o "$OUT/web" --nologo -v q
-mkdir -p "$OUT/app/wwwroot/next"
-cp -r "$OUT/web/wwwroot/." "$OUT/app/wwwroot/next/"
+cp -r "$OUT/web/wwwroot/." "$OUT/app/wwwroot/"
 
 echo "==> Upload release $STAMP"
 ssh "$DEPLOY_HOST" "mkdir -p /opt/boxbox/releases /var/lib/boxbox"
@@ -52,7 +51,9 @@ systemctl daemon-reload
 systemctl enable boxbox >/dev/null
 systemctl restart boxbox
 for i in $(seq 1 20); do
-  if curl -fs http://127.0.0.1:5080/api/summary >/dev/null && curl -fs http://127.0.0.1:5080/next/ >/dev/null; then
+  if curl -fs http://127.0.0.1:5080/api/summary >/dev/null \
+     && curl -fs http://127.0.0.1:5080/ | grep -q 'id="app"' \
+     && curl -fs http://127.0.0.1:5080/classic/ >/dev/null; then
     echo "healthy: $stamp"
     ls -dt /opt/boxbox/releases/* | tail -n +4 | xargs -r rm -rf   # keep last 3
     exit 0

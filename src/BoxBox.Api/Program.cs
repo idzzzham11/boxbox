@@ -35,7 +35,7 @@ using (var scope = app.Services.CreateScope())
     // (NOT NULL DEFAULT 0). It is ignored and inserts keep working through its default.
 }
 
-app.UseBoxBoxStaticFiles(); // classic page at / and the Blazor app at /next/ (see StaticAssets.cs)
+app.UseBoxBoxStaticFiles(); // Blazor app at /, classic page at /classic/ (see StaticAssets.cs)
 
 static DateOnly TodayMy()
 {

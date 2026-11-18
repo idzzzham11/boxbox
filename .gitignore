@@ -13,5 +13,5 @@ HANDOFF.md
 deploy/HOST.md
 .claude/
 
-# Blazor build output copied in for local runs / deploys
-src/BoxBox.Api/wwwroot/next/
+# Local run data
+local-data/

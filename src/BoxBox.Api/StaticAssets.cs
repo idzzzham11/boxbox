@@ -5,15 +5,16 @@ using Microsoft.Net.Http.Headers;
 namespace BoxBox.Api;
 
 /// <summary>
-/// Static file serving for the two front ends: the classic page at "/" and the Blazor WebAssembly app at "/next/".
+/// Static file serving. The Blazor WebAssembly app is the main front end at "/"; the original single-file page
+/// is kept at "/classic/" as a fallback.
+/// <para>
 /// Blazor's publish output ships a pre-compressed copy of every file (.br and .gz). This serves those when the
 /// browser accepts them (7.8 MB of runtime files becomes about 2.5 MB over the wire) and caches the
-/// fingerprinted files for a year, so a phone only downloads the runtime once.
+/// fingerprinted runtime files for a year, so a phone only downloads them once.
+/// </para>
 /// </summary>
 public static class StaticAssets
 {
-    private const string BlazorPrefix = "/next";
-
     // Published Blazor files carry a 10-character fingerprint, e.g. dotnet.native.6ilbvndvcf.js
     private static readonly Regex Fingerprinted = new(@"\.[a-z0-9]{10}\.", RegexOptions.Compiled);
 
@@ -24,20 +25,29 @@ public static class StaticAssets
         types.Mappings[".br"] = "application/octet-stream";
         types.Mappings[".gz"] = "application/octet-stream";
 
-        // The app's base href is /next/, so /next must become /next/ or relative URLs would break.
         app.Use(async (ctx, next) =>
         {
-            if (ctx.Request.Path == BlazorPrefix && HttpMethods.IsGet(ctx.Request.Method))
+            if (HttpMethods.IsGet(ctx.Request.Method))
             {
-                ctx.Response.Redirect(BlazorPrefix + "/" + ctx.Request.QueryString);
-                return;
+                // The Blazor app used to live at /next/. Keep old bookmarks and home-screen icons working.
+                if (ctx.Request.Path.StartsWithSegments("/next"))
+                {
+                    ctx.Response.Redirect("/");
+                    return;
+                }
+                // Relative URLs on the classic page need the trailing slash.
+                if (ctx.Request.Path == "/classic")
+                {
+                    ctx.Response.Redirect("/classic/" + ctx.Request.QueryString);
+                    return;
+                }
             }
             await next();
         });
 
         app.Use(async (ctx, next) =>
         {
-            if (HttpMethods.IsGet(ctx.Request.Method) && ctx.Request.Path.StartsWithSegments(BlazorPrefix))
+            if (HttpMethods.IsGet(ctx.Request.Method) && !ctx.Request.Path.StartsWithSegments("/api"))
             {
                 var path = ctx.Request.Path.Value!;
                 if (path.EndsWith('/')) path += "index.html";
@@ -59,7 +69,7 @@ public static class StaticAssets
             await next();
         });
 
-        app.UseDefaultFiles(); // "/" -> /index.html, "/next/" -> /next/index.html
+        app.UseDefaultFiles(); // "/" -> /index.html, "/classic/" -> /classic/index.html
         app.UseStaticFiles(new StaticFileOptions
         {
             ContentTypeProvider = types,
@@ -69,11 +79,14 @@ public static class StaticAssets
                 var response = ctx.Context.Response;
                 if (ctx.Context.Items["originalContentType"] is string type) response.ContentType = type;
 
+                // Judge caching by the logical file, not the .br/.gz variant that is actually being sent.
                 var path = ctx.Context.Request.Path.Value ?? "";
-                if (path.StartsWith(BlazorPrefix + "/_framework/", StringComparison.Ordinal) && Fingerprinted.IsMatch(path))
+                if (path.EndsWith(".br") || path.EndsWith(".gz")) path = path[..^3];
+
+                if (path.StartsWith("/_framework/", StringComparison.Ordinal) && Fingerprinted.IsMatch(path))
                     response.Headers.CacheControl = "public,max-age=31536000,immutable";
-                else if (path.StartsWith(BlazorPrefix, StringComparison.Ordinal))
-                    response.Headers.CacheControl = "no-cache"; // index.html etc.: always revalidate so updates show up
+                else if (path is "/index.html" or "/css/app.css" or "/manifest.webmanifest" || path.StartsWith("/classic/", StringComparison.Ordinal))
+                    response.Headers.CacheControl = "no-cache"; // entry files: always revalidate so updates show up
             }
         });
         return app;

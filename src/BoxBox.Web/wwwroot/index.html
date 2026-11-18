@@ -5,13 +5,19 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BoxBox</title>
-    <!-- The app is served under /next/, so every relative URL below resolves against this base. -->
-    <base href="/next/" />
+    <!-- The app is served from the site root, so every relative URL below resolves against "/". -->
+    <base href="/" />
     <meta name="theme-color" content="#d9322b" />
+    <!-- Home-screen install: the manifest (Android/Chrome) and the Apple tags (iPhone Safari). -->
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="BoxBox" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="preload" id="webassembly" />
     <link rel="stylesheet" href="css/app.css" />
-    <link rel="icon" type="image/png" href="/icon-192.png" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" href="icon-192.png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <script type="importmap"></script>
 </head>
 
