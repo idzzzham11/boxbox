@@ -52,8 +52,7 @@ systemctl enable boxbox >/dev/null
 systemctl restart boxbox
 for i in $(seq 1 20); do
   if curl -fs http://127.0.0.1:5080/api/summary >/dev/null \
-     && curl -fs http://127.0.0.1:5080/ | grep -q 'id="app"' \
-     && curl -fs http://127.0.0.1:5080/classic/ >/dev/null; then
+     && curl -fs http://127.0.0.1:5080/ | grep -q 'id="app"'; then
     echo "healthy: $stamp"
     ls -dt /opt/boxbox/releases/* | tail -n +4 | xargs -r rm -rf   # keep last 3
     exit 0

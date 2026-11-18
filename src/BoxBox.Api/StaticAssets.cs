@@ -5,8 +5,7 @@ using Microsoft.Net.Http.Headers;
 namespace BoxBox.Api;
 
 /// <summary>
-/// Static file serving. The Blazor WebAssembly app is the main front end at "/"; the original single-file page
-/// is kept at "/classic/" as a fallback.
+/// Static file serving for the Blazor WebAssembly app, which is the only front end and lives at "/".
 /// <para>
 /// Blazor's publish output ships a pre-compressed copy of every file (.br and .gz). This serves those when the
 /// browser accepts them (7.8 MB of runtime files becomes about 2.5 MB over the wire) and caches the
@@ -33,12 +32,6 @@ public static class StaticAssets
                 if (ctx.Request.Path.StartsWithSegments("/next"))
                 {
                     ctx.Response.Redirect("/");
-                    return;
-                }
-                // Relative URLs on the classic page need the trailing slash.
-                if (ctx.Request.Path == "/classic")
-                {
-                    ctx.Response.Redirect("/classic/" + ctx.Request.QueryString);
                     return;
                 }
             }
@@ -69,7 +62,7 @@ public static class StaticAssets
             await next();
         });
 
-        app.UseDefaultFiles(); // "/" -> /index.html, "/classic/" -> /classic/index.html
+        app.UseDefaultFiles(); // "/" -> /index.html
         app.UseStaticFiles(new StaticFileOptions
         {
             ContentTypeProvider = types,
@@ -85,7 +78,7 @@ public static class StaticAssets
 
                 if (path.StartsWith("/_framework/", StringComparison.Ordinal) && Fingerprinted.IsMatch(path))
                     response.Headers.CacheControl = "public,max-age=31536000,immutable";
-                else if (path is "/index.html" or "/css/app.css" or "/manifest.webmanifest" || path.StartsWith("/classic/", StringComparison.Ordinal))
+                else if (path is "/index.html" or "/css/app.css" or "/manifest.webmanifest")
                     response.Headers.CacheControl = "no-cache"; // entry files: always revalidate so updates show up
             }
         });

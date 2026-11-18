@@ -40,8 +40,7 @@ cd boxbox
 ```
 
 Open http://localhost:5080. This builds the API and the Blazor front end together and keeps your data in
-`local-data/boxbox.db`. To run just the API (JSON endpoints and the `/classic/` page, no Blazor app) use
-`dotnet run` in `src/BoxBox.Api`.
+`local-data/boxbox.db`. To run just the JSON API (no web pages) use `dotnet run` in `src/BoxBox.Api`.
 
 Run the tests from the repository root:
 
@@ -149,12 +148,10 @@ curl -X POST http://localhost:PORT/api/import \
 | `GET` | `/api/forecast` | Next fill-up date / amount / litres and projected month spend |
 | `POST` | `/api/import` | CSV text import (see above) |
 
-## Front ends
+## Front end
 
-- `/` is the main app, written in **Blazor WebAssembly** (`src/BoxBox.Web`). It shares its request and response
-  types with the API through `BoxBox.Core`, and its components are tested with bUnit.
-- `/classic/` is the original single-file HTML dashboard (`src/BoxBox.Api/wwwroot/classic/index.html`, no build
-  step). It uses the same API and database, and is kept as a lightweight fallback.
+The app is a single **Blazor WebAssembly** web app (`src/BoxBox.Web`) served from `/`. It shares its request and
+response types with the API through `BoxBox.Core`, and its components are tested with bUnit.
 
 The Blazor files are not in the API project's source folder. They are built and combined with the API when you
 publish, so to try everything locally use the helper script:
