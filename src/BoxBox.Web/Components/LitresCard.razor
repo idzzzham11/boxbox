@@ -18,8 +18,30 @@
             <div class="stat full"><small>Enter the trip-meter km on each fill-up (filled to the pump's cut-off) to see fuel economy.</small></div>
         }
     </div>
+
+    <h3>Fuel economy per tank (L/100km)</h3>
+    <LineChart Points="EconomyPoints"
+               AverageLine="(double?)Summary.Economy?.AverageLitresPer100Km"
+               ZeroBased="false"
+               Format="@(v => v.ToString("0.0"))"
+               EmptyText="No graph yet. It appears after your second fill-up with trip km entered; lower is better."
+               AriaLabel="@EconomyAriaLabel" />
 </section>
 
 @code {
+    private const int MaxPoints = 30;
+
     [Parameter, EditorRequired] public SpendSummaryResult Summary { get; set; } = default!;
+
+    private IReadOnlyList<ChartPoint> EconomyPoints =>
+        (Summary.Economy?.Segments ?? [])
+            .TakeLast(MaxPoints)
+            .Select(s => new ChartPoint(s.Date, (double)s.LitresPer100Km,
+                $"{s.Date:yyyy-MM-dd} · {Fmt.Num(s.LitresPer100Km)} L/100km ({s.Km} km, {Fmt.Num(s.Litres, "0.0")} L)"))
+            .ToList();
+
+    private string EconomyAriaLabel =>
+        EconomyPoints.Count == 0
+            ? "Fuel economy chart, no data yet"
+            : $"Line chart of fuel economy per tank, lower is better; latest {EconomyPoints[^1].Tooltip}";
 }

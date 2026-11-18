@@ -6,8 +6,38 @@
         <Stat Value="@Fmt.Rm(Summary.AverageMonthlySpent)" Label="Avg / month" />
         <Stat Value="@Fmt.Rm(Summary.TotalSpent)" Label="@($"Total · {Summary.EntryCount} fill-ups")" />
     </div>
+
+    <h3>Spend per fill-up</h3>
+    <LineChart Points="SpendPoints"
+               ZeroBased="true"
+               Format="@(v => "RM " + v.ToString("0"))"
+               EmptyText="No fill-ups yet."
+               AriaLabel="@SpendAriaLabel" />
+
+    <MonthBars Data="Summary.Months" />
 </section>
 
 @code {
+    private const int MaxPoints = 30;
+
     [Parameter, EditorRequired] public SpendSummaryResult Summary { get; set; } = default!;
+
+    /// <summary>The history rows (newest first, as the API returns them); the chart uses the latest 30.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<EntryDto> Entries { get; set; } = [];
+
+    private IReadOnlyList<ChartPoint> SpendPoints =>
+        Entries.OrderBy(e => e.Date).TakeLast(MaxPoints)
+            .Select(e => new ChartPoint(e.Date, (double)e.AmountPaid, $"{e.Date:yyyy-MM-dd} · {Fmt.Rm(e.AmountPaid)}"))
+            .ToList();
+
+    private string SpendAriaLabel
+    {
+        get
+        {
+            var points = SpendPoints;
+            return points.Count == 0
+                ? "Spend per fill-up chart, no data"
+                : $"Line chart of spend per fill-up over the last {points.Count} fill-ups; latest {points.OrderBy(p => p.Date).Last().Tooltip}";
+        }
+    }
 }

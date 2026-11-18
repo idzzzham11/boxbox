@@ -13,11 +13,10 @@ else if (summary is null || entries is null || forecast is null)
 }
 else
 {
-    <PriceCard Summary="summary" />
+    <PriceCard Summary="summary" Entries="entries" />
     <LitresCard Summary="summary" />
     <AddEntryForm OnSaved="Load" />
     <ForecastCard Forecast="forecast" />
-    <MonthBars Data="summary.Months" />
     <HistoryList Entries="entries" OnDelete="Delete" />
     <ImportBox OnImported="Load" />
 }

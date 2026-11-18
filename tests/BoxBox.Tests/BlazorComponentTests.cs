@@ -78,13 +78,15 @@ public class BlazorComponentTests : BunitContext
     {
         Backend();
         var cut = Render<Home>();
-        cut.WaitForState(() => cut.FindAll("section.card").Count >= 7, TimeSpan.FromSeconds(5));
+        cut.WaitForState(() => cut.FindAll("section.card").Count >= 6, TimeSpan.FromSeconds(5));
 
         var text = cut.Markup;
         Assert.Contains("<h2>Price</h2>", text);
         Assert.Contains("<h2>Litres</h2>", text);
         Assert.Contains("<h2>Forecast</h2>", text);
-        Assert.Contains("<h2>Spending by month</h2>", text);
+        Assert.Contains("<h3>Spending by month</h3>", text);   // now inside the Price card
+        Assert.Equal(6, cut.FindAll("section.card").Count);
+        Assert.True(cut.FindAll("svg.chart").Count >= 1);
         Assert.Contains("<h2>History</h2>", text);
         Assert.Contains("12 fill-ups", text);                  // total card
         Assert.Contains("12 estimated", text);                 // litres are all estimated in this sample
@@ -95,7 +97,7 @@ public class BlazorComponentTests : BunitContext
     public void Price_card_shows_formatted_money()
     {
         var summary = SpendSummary.Compute(Sample(), Today, Budi);
-        var cut = Render<PriceCard>(p => p.Add(x => x.Summary, summary));
+        var cut = Render<PriceCard>(p => p.Add(x => x.Summary, summary).Add(x => x.Entries, []));
         Assert.Contains("RM " + summary.TotalSpent.ToString("N2", System.Globalization.CultureInfo.InvariantCulture), cut.Markup);
         Assert.Contains("This month", cut.Markup);
         Assert.Equal(4, cut.FindAll(".stat").Count);
@@ -116,7 +118,8 @@ public class BlazorComponentTests : BunitContext
     {
         var summary = SpendSummary.Compute([E("2026-11-01", 50)], Today, Budi);
         var cut = Render<LitresCard>(p => p.Add(x => x.Summary, summary));
-        Assert.DoesNotContain("L/100km", cut.Markup);
+        Assert.DoesNotContain("Avg economy", cut.Markup);   // no economy figures yet
+        Assert.DoesNotContain("Last fill-up", cut.Markup);
         Assert.Contains("trip-meter", cut.Markup);
     }
 

@@ -1,6 +1,6 @@
-<section class="card">
-    <h2>Spending by month</h2>
-    <div class="bars">
+@* Not a card of its own any more: it is drawn inside the Price card. *@
+<h3>Spending by month</h3>
+<div class="bars">
         @if (months.Count == 0)
         {
             <div class="empty">No data yet.</div>
@@ -14,8 +14,7 @@
                 <span>@Fmt.Rm(m.Total)</span>
             </div>
         }
-    </div>
-</section>
+</div>
 
 @code {
     private static readonly string[] Names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

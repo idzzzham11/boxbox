@@ -1,0 +1,80 @@
+@using System.Globalization
+@* A small line chart drawn as inline SVG. The browser scales it to the card's width (viewBox), the colours come
+   from CSS variables so it follows light/dark mode, and every number is computed in C# (see ChartScale.cs). *@
+@if (Points.Count == 0)
+{
+    <p class="empty">@EmptyText</p>
+}
+else
+{
+    var points = Points.OrderBy(p => p.Date).ToList();
+    var lo = points.Min(p => p.Value);
+    var hi = points.Max(p => p.Value);
+    if (AverageLine is { } avg) { lo = Math.Min(lo, avg); hi = Math.Max(hi, avg); }
+    var scale = NiceScale.For(lo, hi, ZeroBased);
+
+    var plotLeft = 40.0; var plotRight = Width - 12.0; var plotTop = 14.0; var plotBottom = Height - 22.0;
+    var first = points[0].Date; var last = points[^1].Date;
+    double X(ChartPoint p) => ChartMath.X(p.Date, first, last, plotLeft, plotRight);
+    double Y(double v) => scale.Y(v, plotTop, plotBottom);
+
+    <svg class="chart" viewBox="0 0 @F(Width) @F(Height)" role="img" aria-label="@AriaLabel">
+        @foreach (var tick in scale.Ticks())
+        {
+            <line class="grid" x1="@F(plotLeft)" x2="@F(plotRight)" y1="@F(Y(tick))" y2="@F(Y(tick))" />
+            <SvgLabel X="@F(plotLeft - 5)" Y="@F(Y(tick) + 3)" Anchor="end" Text="@Format(tick)" />
+        }
+
+        @if (AverageLine is { } average)
+        {
+            <line class="avg" x1="@F(plotLeft)" x2="@F(plotRight)" y1="@F(Y(average))" y2="@F(Y(average))">
+                <title>Average @Format(average)</title>
+            </line>
+        }
+
+        @* A line needs two points; a single point is drawn as just a dot. *@
+        @if (points.Count > 1)
+        {
+            <polyline class="line" points="@string.Join(" ", points.Select(p => F(X(p)) + "," + F(Y(p.Value))))" />
+        }
+        @foreach (var p in points)
+        {
+            <circle class="dot" cx="@F(X(p))" cy="@F(Y(p.Value))" r="@(p == points[^1] ? "4" : "2.5")">
+                <title>@p.Tooltip</title>
+            </circle>
+        }
+
+        @* Label the newest value, nudged left if it would run off the right edge. *@
+        <SvgLabel Class="latest" X="@F(Math.Min(X(points[^1]), plotRight - 14))" Y="@F(Y(points[^1].Value) - 8)" Anchor="middle" Text="@Format(points[^1].Value)" />
+
+        <SvgLabel X="@F(plotLeft)" Y="@F(Height - 6)" Anchor="start" Text="@first.ToString("d MMM", CultureInfo.InvariantCulture)" />
+        @if (last != first)
+        {
+            <SvgLabel X="@F(plotRight)" Y="@F(Height - 6)" Anchor="end" Text="@last.ToString("d MMM", CultureInfo.InvariantCulture)" />
+        }
+    </svg>
+}
+
+@code {
+    private const double Width = 320;
+    private const double Height = 150;
+
+    [Parameter, EditorRequired] public IReadOnlyList<ChartPoint> Points { get; set; } = [];
+
+    /// <summary>How axis labels and the latest value are written, e.g. "RM 60" or "7.5".</summary>
+    [Parameter] public Func<double, string> Format { get; set; } = v => v.ToString("0.##", CultureInfo.InvariantCulture);
+
+    /// <summary>Optional dashed horizontal reference line, such as the overall average.</summary>
+    [Parameter] public double? AverageLine { get; set; }
+
+    /// <summary>Start the y-axis at zero (right for money, misleading for a metric that hovers around 7).</summary>
+    [Parameter] public bool ZeroBased { get; set; }
+
+    [Parameter] public string EmptyText { get; set; } = "Not enough data yet.";
+
+    /// <summary>Read out by screen readers in place of the picture.</summary>
+    [Parameter, EditorRequired] public string AriaLabel { get; set; } = "";
+
+    // SVG attributes need '.' as the decimal separator whatever the browser's language is.
+    private static string F(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+}

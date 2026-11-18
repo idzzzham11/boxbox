@@ -1,0 +1,11 @@
+@* An SVG <text> label. It lives in its own component because Razor reserves the tag name <text>
+   (it marks plain-text blocks inside code), so it cannot be written directly inside @foreach / @if blocks. *@
+<text class="@Class" x="@X" y="@Y" text-anchor="@Anchor">@Text</text>
+
+@code {
+    [Parameter, EditorRequired] public string X { get; set; } = "0";
+    [Parameter, EditorRequired] public string Y { get; set; } = "0";
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+    [Parameter] public string Anchor { get; set; } = "start";
+    [Parameter] public string? Class { get; set; }
+}

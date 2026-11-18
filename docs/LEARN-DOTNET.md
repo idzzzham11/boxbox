@@ -77,7 +77,13 @@ Key ideas, each with an example:
 - **Services and DI in the browser:** `Services/BoxBoxApi.cs`, registered in `Program.cs`, injected with `@inject`.
 - **JavaScript interop:** `HistoryList.razor` calls the browser's `confirm()` dialog.
 
-**Exercise:** add a "Cost per litre" `Stat` to `LitresCard.razor`.
+- **Charts without a library:** `Components/LineChart.razor` draws an SVG from C#. The maths (nice axis ticks,
+  mapping values to pixels) lives in `ChartScale.cs` as plain functions with unit tests in `ChartTests.cs`, so
+  the visual part stays thin. `SvgLabel.razor` exists because Razor reserves the tag name `<text>`; a good example
+  of a framework quirk worked around with a tiny component.
+
+**Exercise:** add a "Cost per litre" `Stat` to `LitresCard.razor`. Then add a second line to `LineChart` (for
+example, last month's spend) and decide what the parameters should look like.
 
 ## 9. Testing components with bUnit
 
