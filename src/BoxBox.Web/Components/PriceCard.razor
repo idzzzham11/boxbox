@@ -7,12 +7,14 @@
         <Stat Value="@Fmt.Rm(Summary.TotalSpent)" Label="@($"Total · {Summary.EntryCount} fill-ups")" />
     </div>
 
-    <h3>Spend per fill-up</h3>
-    <LineChart Points="SpendPoints"
-               ZeroBased="true"
-               Format="@(v => "RM " + v.ToString("0"))"
-               EmptyText="No fill-ups yet."
-               AriaLabel="@SpendAriaLabel" />
+    @if (SpendPoints.Count > 0)
+    {
+        <h3>Spend per fill-up</h3>
+        <LineChart Points="SpendPoints"
+                   ZeroBased="true"
+                   Format="@(v => "RM " + v.ToString("0"))"
+                   AriaLabel="@SpendAriaLabel" />
+    }
 
     <MonthBars Data="Summary.Months" />
 </section>

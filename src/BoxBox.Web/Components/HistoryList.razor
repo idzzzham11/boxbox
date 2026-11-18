@@ -1,13 +1,9 @@
 @inject IJSRuntime JS
 
-<section class="card">
-    <h2>History</h2>
-    @if (Entries.Count == 0)
-    {
-        <div class="empty">Nothing yet. Add your first fill-up above.</div>
-    }
-    else
-    {
+@if (Entries.Count > 0)
+{
+    <section class="card">
+        <h2>History</h2>
         <ul>
             @foreach (var e in Entries.Take(50))
             {
@@ -28,8 +24,8 @@
                 </li>
             }
         </ul>
-    }
-</section>
+    </section>
+}
 
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<EntryDto> Entries { get; set; } = [];

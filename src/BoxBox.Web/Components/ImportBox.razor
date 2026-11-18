@@ -3,8 +3,7 @@
 <section class="card">
     <details>
         <summary>Import past amounts</summary>
-        <p class="empty">One per line: <code>date,amount[,litres[,trip km]]</code>. Dates as 2026-03-14 or 14/03/2026.</p>
-        <textarea @bind="csv" placeholder="2026-03-14,60&#10;2026-03-28,55.40,27.1"></textarea>
+        <textarea @bind="csv" placeholder="date,amount,litres,trip km&#10;2026-03-14,60&#10;2026-03-28,55.40,27.1,410"></textarea>
         <button type="button" @onclick="Import" disabled="@busy">Import</button>
         <div class="msg" role="status">@message</div>
     </details>

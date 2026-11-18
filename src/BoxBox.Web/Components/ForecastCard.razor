@@ -1,39 +1,28 @@
-<section class="card">
-    <h2>Forecast</h2>
-    @if (!Forecast.Available)
-    {
-        <p class="note">@(Forecast.Reason ?? "No forecast yet.")</p>
-    }
-    else
-    {
-        var days = Forecast.NextDate!.Value.DayNumber - Fmt.TodayMy().DayNumber;
-        var when = days <= 0 ? "any day now" : days == 1 ? "tomorrow" : $"in {days} days";
-        var interval = Forecast.IntervalDays!;
-        var amount = Forecast.Amount!;
-        // BeatsNaive tells us whether the backtest found the chosen model better than "same as last time".
-        var better = interval.BeatsNaive && amount.BeatsNaive;
+@* Data only: with too little history there is nothing to forecast, so the card is simply not shown. *@
+@if (Forecast.Available)
+{
+    var days = Forecast.NextDate!.Value.DayNumber - Fmt.TodayMy().DayNumber;
+    var when = days <= 0 ? "any day now" : days == 1 ? "tomorrow" : $"in {days} days";
+    var interval = Forecast.IntervalDays!;
+    var amount = Forecast.Amount!;
 
+    <section class="card">
+        @* The confidence stays visible as a few quiet words, because a forecast from a handful of fill-ups is a guess. *@
+        <h2>Forecast <span class="quiet">· @Forecast.Confidence.ToLowerInvariant() confidence</span></h2>
         <div class="stats">
             <Stat Value="@Forecast.NextDate.Value.ToString("yyyy-MM-dd")"
-                  Label="@($"Next fill-up ({when}) · {Math.Round(interval.Low)}–{Math.Round(interval.High)} days apart")" />
+                  Label="@($"Next fill-up · {when}")" />
             <Stat Value="@("≈ " + Fmt.RmShort(amount.Predicted))"
-                  Label="@($"Next fill-up amount · {Fmt.RmShort(amount.Low)} – {Fmt.RmShort(amount.High)}")" />
+                  Label="@($"Amount · {Fmt.RmShort(amount.Low)} – {Fmt.RmShort(amount.High)}")" />
             @if (Forecast.Litres is { } litres)
             {
                 <Stat Value="@("≈ " + Fmt.Litres(litres.Predicted))"
-                      Label="@($"Next fill-up litres · {Fmt.Litres(litres.Low)} – {Fmt.Litres(litres.High)}")" />
+                      Label="@($"Litres · {Fmt.Litres(litres.Low)} – {Fmt.Litres(litres.High)}")" />
             }
-            <Stat Value="@Fmt.Rm(Forecast.ProjectedMonthSpend)" Label="Projected spend this month" />
+            <Stat Value="@Fmt.Rm(Forecast.ProjectedMonthSpend)" Label="Projected this month" />
         </div>
-        <p class="note">
-            @Forecast.Confidence confidence: based on @Forecast.FillUps fill-ups. Ranges are the typical error when each forecast
-            model was tested on your past fill-ups.
-            @(better ? "These models did better than just repeating your last fill-up." : "Treat as a rough guide: at least one forecast was no better than repeating your last fill-up.")
-            @(Forecast.LitresDerivedFromPrice ? "Litres follow from the amount at the set price, so they add no new information." : "")
-            Forecasts improve as you add more fill-ups.
-        </p>
-    }
-</section>
+    </section>
+}
 
 @code {
     [Parameter, EditorRequired] public ForecastResult Forecast { get; set; } = default!;

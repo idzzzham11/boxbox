@@ -1,11 +1,11 @@
 <section class="card">
     <h2>Litres</h2>
     <div class="stats">
-        @* The same four figures as the Price card, in litres. *@
-        <Stat Value="@(Summary.ThisMonthLitres is { } t ? Fmt.Litres(t) : "—")" Label="This month" />
-        <Stat Value="@(Summary.LastMonthLitres is { } m ? Fmt.Litres(m) : "—")" Label="Last month" />
-        <Stat Value="@(Summary.AverageMonthlyLitres is { } a ? Fmt.Litres(a) : "—")" Label="Avg / month" />
-        <Stat Value="@(Summary.TotalLitres is { } l ? Fmt.Litres(l) : "—")" Label="Total litres" />
+        @* The same four figures as the Price card, in litres. "≈" marks figures that include estimated litres. *@
+        <Stat Value="@Litres(Summary.ThisMonthLitres)" Label="This month" />
+        <Stat Value="@Litres(Summary.LastMonthLitres)" Label="Last month" />
+        <Stat Value="@Litres(Summary.AverageMonthlyLitres)" Label="Avg / month" />
+        <Stat Value="@Litres(Summary.TotalLitres)" Label="Total litres" />
         <Stat Value="@(Summary.AveragePricePerLitre is { } p ? Fmt.Rm(p) + "/L" : "—")" Label="Avg price per litre" />
 
         @if (Summary.Economy is { SegmentCount: > 0 } e)
@@ -16,30 +16,27 @@
             <Stat Value="@($"RM {Fmt.Num(e.AverageCostPerKm!.Value, "0.000")}/km")" Label="Avg cost per km" />
             <Stat Value="@($"{e.TotalKm:N0} km")" Label="@($"Measured over {e.SegmentCount} {(e.SegmentCount == 1 ? "tank" : "tanks")}")" />
         }
-        else
-        {
-            <div class="stat full"><small>Enter the trip-meter km on each fill-up (filled to the pump's cut-off) to see fuel economy.</small></div>
-        }
     </div>
 
-    @if (Summary.EstimatedLitresEntries > 0)
+    @if (EconomyPoints.Count > 0)
     {
-        <p class="note">@Summary.EstimatedLitresEntries of @Summary.EntryCount fill-ups have estimated litres, calculated from the amount paid at the set price. Enter real litres to replace an estimate.</p>
+        <h3>Fuel economy per tank (L/100km)</h3>
+        <LineChart Points="EconomyPoints"
+                   AverageLine="(double?)Summary.Economy?.AverageLitresPer100Km"
+                   ZeroBased="false"
+                   Format="@(v => v.ToString("0.0"))"
+                   AriaLabel="@EconomyAriaLabel" />
     }
-
-    <h3>Fuel economy per tank (L/100km)</h3>
-    <LineChart Points="EconomyPoints"
-               AverageLine="(double?)Summary.Economy?.AverageLitresPer100Km"
-               ZeroBased="false"
-               Format="@(v => v.ToString("0.0"))"
-               EmptyText="No graph yet. It appears after your second fill-up with trip km entered; lower is better."
-               AriaLabel="@EconomyAriaLabel" />
 </section>
 
 @code {
     private const int MaxPoints = 30;
 
     [Parameter, EditorRequired] public SpendSummaryResult Summary { get; set; } = default!;
+
+    // Some litres come from the amount paid at the set price, so say so with a leading "≈" instead of a paragraph.
+    private string Litres(decimal? value) =>
+        value is null ? "—" : (Summary.EstimatedLitresEntries > 0 ? "≈ " : "") + Fmt.Litres(value.Value);
 
     private IReadOnlyList<ChartPoint> EconomyPoints =>
         (Summary.Economy?.Segments ?? [])

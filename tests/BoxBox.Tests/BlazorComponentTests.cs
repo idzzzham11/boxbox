@@ -83,14 +83,14 @@ public class BlazorComponentTests : BunitContext
         var text = cut.Markup;
         Assert.Contains("<h2>Price</h2>", text);
         Assert.Contains("<h2>Litres</h2>", text);
-        Assert.Contains("<h2>Forecast</h2>", text);
+        Assert.Contains("Forecast <span", text);               // heading carries the quiet confidence words
         Assert.Contains("<h3>Spending by month</h3>", text);   // now inside the Price card
         Assert.Equal(5, cut.FindAll("section.card").Count);   // Forecast, Price, Litres, History, Import
         Assert.True(cut.FindAll("svg.chart").Count >= 1);
         Assert.Contains("<h2>History</h2>", text);
         Assert.Contains("12 fill-ups", text);                  // total card
-        Assert.Contains("12 of 12 fill-ups have estimated litres", text.Replace("\n", " ").Replace("  ", " ")); // all estimated in this sample
-        Assert.Contains("Low confidence", text.Replace("\n", " ").Replace("  ", " "));
+        Assert.Contains("≈", cut.Find("section.card:nth-of-type(3)").InnerHtml);   // Litres card: estimated litres are marked
+        Assert.Contains("low confidence", text);                                    // quiet confidence note in the Forecast heading
     }
 
     [Fact]
@@ -114,32 +114,50 @@ public class BlazorComponentTests : BunitContext
     }
 
     [Fact]
-    public void Litres_card_explains_how_to_get_economy_when_there_is_none()
+    public void Litres_card_shows_no_economy_figures_or_hints_when_there_is_none()
     {
         var summary = SpendSummary.Compute([E("2026-11-01", 50)], Today, Budi);
         var cut = Render<LitresCard>(p => p.Add(x => x.Summary, summary));
         Assert.DoesNotContain("Avg economy", cut.Markup);   // no economy figures yet
         Assert.DoesNotContain("Last fill-up", cut.Markup);
-        Assert.Contains("trip-meter", cut.Markup);
+        Assert.DoesNotContain("trip-meter", cut.Markup);
     }
 
     [Fact]
-    public void Forecast_card_explains_why_there_is_no_forecast()
+    public void Forecast_card_is_not_shown_when_there_is_too_little_history()
     {
         var f = SpendForecaster.Compute(Sample().Take(3), Today, Budi);
         var cut = Render<ForecastCard>(p => p.Add(x => x.Forecast, f));
-        Assert.Contains("at least 6", cut.Markup);
-        Assert.Empty(cut.FindAll(".stat"));
+        Assert.Equal("", cut.Markup.Trim());
     }
 
     [Fact]
-    public void Forecast_card_shows_ranges_and_the_derived_litres_warning()
+    public void Forecast_card_shows_figures_and_ranges_with_confidence_in_the_heading_and_no_paragraph()
     {
         var f = SpendForecaster.Compute(Sample(), Today, Budi);
         var cut = Render<ForecastCard>(p => p.Add(x => x.Forecast, f));
         Assert.Contains("Next fill-up", cut.Markup);
         Assert.Contains("≈", cut.Markup);
-        Assert.Contains("add no new information", cut.Markup);
+        Assert.Contains("low confidence", cut.Find("h2").TextContent);
+        Assert.Equal(4, cut.FindAll(".stat").Count);
+        Assert.Empty(cut.FindAll("p"));                   // minimalist: no explanatory text
+    }
+
+    [Fact]
+    public void History_card_is_not_shown_when_there_are_no_entries()
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        var cut = Render<HistoryList>(p => p.Add(x => x.Entries, []));
+        Assert.Equal("", cut.Markup.Trim());
+    }
+
+    [Fact]
+    public void Import_card_has_no_instruction_paragraph_but_shows_the_format_in_the_placeholder()
+    {
+        Backend();
+        var cut = Render<ImportBox>();
+        Assert.Empty(cut.FindAll("p"));
+        Assert.Contains("date,amount,litres,trip km", cut.Find("textarea").GetAttribute("placeholder"));
     }
 
     [Fact]
@@ -251,7 +269,7 @@ public class BlazorComponentTests : BunitContext
         var cut = Render<Home>();
         cut.WaitForState(() => cut.FindAll("section.card").Count >= 5, TimeSpan.FromSeconds(5));
         var headings = cut.FindAll("section.card > h2").Select(h => h.TextContent).ToList();
-        Assert.Equal(["Forecast", "Price", "Litres", "History"], headings.Take(4));
+        Assert.Equal(["Forecast", "Price", "Litres", "History"], headings.Take(4).Select(h => h.Split(" · ")[0]));
     }
 
     [Fact]

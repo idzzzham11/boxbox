@@ -73,14 +73,12 @@ public class ChartComponentTests : BunitContext
         double.Parse(e.GetAttribute(name)!, CultureInfo.InvariantCulture);
 
     [Fact]
-    public void Empty_series_shows_the_empty_text_and_no_svg()
+    public void Empty_series_draws_nothing_at_all()
     {
         var cut = Render<LineChart>(p => p
             .Add(x => x.Points, [])
-            .Add(x => x.EmptyText, "Nothing here yet.")
             .Add(x => x.AriaLabel, "test"));
-        Assert.Contains("Nothing here yet.", cut.Markup);
-        Assert.Empty(cut.FindAll("svg"));
+        Assert.Equal("", cut.Markup.Trim());
     }
 
     [Fact]
@@ -160,7 +158,9 @@ public class ChartComponentTests : BunitContext
     public void Price_card_charts_the_latest_30_fill_ups()
     {
         var entries = Entries(40);
-        var summary = SpendSummary.Compute([], new DateOnly(2026, 11, 18));
+        // A summary built from the same fill-ups, so the month bars have data too.
+        var summary = SpendSummary.Compute(
+            entries.Select(e => new FuelEntry(e.Id, TestData.Car, e.Date, e.AmountPaid)), new DateOnly(2026, 11, 18));
         var cut = Render<PriceCard>(p => p.Add(x => x.Summary, summary).Add(x => x.Entries, entries));
         Assert.Equal(30, cut.FindAll("svg.chart circle").Count);
         Assert.Contains("Spend per fill-up", cut.Markup);
@@ -168,12 +168,15 @@ public class ChartComponentTests : BunitContext
     }
 
     [Fact]
-    public void Price_card_says_so_when_there_are_no_fill_ups()
+    public void Price_card_with_no_fill_ups_shows_figures_but_no_graph_headings_or_messages()
     {
         var summary = SpendSummary.Compute([], new DateOnly(2026, 11, 18));
         var cut = Render<PriceCard>(p => p.Add(x => x.Summary, summary).Add(x => x.Entries, []));
         Assert.Empty(cut.FindAll("svg.chart"));
-        Assert.Contains("No fill-ups yet.", cut.Markup);
+        Assert.DoesNotContain("Spend per fill-up", cut.Markup);
+        Assert.DoesNotContain("Spending by month", cut.Markup);
+        Assert.DoesNotContain("No ", cut.Markup);        // no "No data yet" style messages
+        Assert.Equal(4, cut.FindAll(".stat").Count);
     }
 
     private static FuelEntry E(string date, decimal amount, int? trip) =>
@@ -192,12 +195,13 @@ public class ChartComponentTests : BunitContext
     }
 
     [Fact]
-    public void Litres_card_explains_the_empty_graph_when_there_is_no_trip_km()
+    public void Litres_card_hides_the_economy_graph_and_its_heading_when_there_is_no_trip_km()
     {
         var summary = SpendSummary.Compute([E("2026-11-01", 50, null)], new DateOnly(2026, 11, 18));
         var cut = Render<LitresCard>(p => p.Add(x => x.Summary, summary));
         Assert.Empty(cut.FindAll("svg.chart"));
-        Assert.Contains("second fill-up with trip km", cut.Markup);
+        Assert.DoesNotContain("Fuel economy per tank", cut.Markup);
+        Assert.DoesNotContain("trip km", cut.Markup);     // no instructions either
     }
 
     // ---- Litres card figures (same four as the Price card) ----
@@ -238,14 +242,26 @@ public class ChartComponentTests : BunitContext
     }
 
     [Fact]
-    public void Litres_card_notes_how_many_fill_ups_have_estimated_litres()
+    public void Litre_figures_carry_an_approx_sign_when_they_include_estimates_and_no_paragraph()
     {
         var summary = SpendSummary.Compute([
             new FuelEntry(Guid.NewGuid(), TestData.Car, new DateOnly(2026, 10, 10), 50m),         // estimated
             new FuelEntry(Guid.NewGuid(), TestData.Car, new DateOnly(2026, 11, 10), 60m, 28m)],   // recorded
             Today, Budi);
         var cut = Render<LitresCard>(p => p.Add(x => x.Summary, summary));
-        Assert.Contains("1 of 2 fill-ups have estimated litres", cut.Markup);
+        var stats = StatValues(cut);
+        Assert.Contains(stats, s => s.StartsWith("≈ ") && s.Contains("Total litres"));
+        Assert.Contains(stats, s => s.StartsWith("≈ ") && s.Contains("This month"));
+        Assert.Empty(cut.FindAll("p"));                   // minimalist: no explanatory text
+    }
+
+    [Fact]
+    public void Litre_figures_have_no_approx_sign_when_every_litre_was_recorded()
+    {
+        var summary = SpendSummary.Compute([
+            new FuelEntry(Guid.NewGuid(), TestData.Car, new DateOnly(2026, 10, 10), 60m, 30m),
+            new FuelEntry(Guid.NewGuid(), TestData.Car, new DateOnly(2026, 11, 10), 60m, 28m)], Today, Budi);
+        Assert.DoesNotContain("≈", Render<LitresCard>(p => p.Add(x => x.Summary, summary)).Markup);
     }
 }
 

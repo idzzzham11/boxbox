@@ -1,11 +1,8 @@
 @using System.Globalization
 @* A small line chart drawn as inline SVG. The browser scales it to the card's width (viewBox), the colours come
    from CSS variables so it follows light/dark mode, and every number is computed in C# (see ChartScale.cs). *@
-@if (Points.Count == 0)
-{
-    <p class="empty">@EmptyText</p>
-}
-else
+@* No points, nothing drawn: callers decide whether to show a heading around an empty chart. *@
+@if (Points.Count > 0)
 {
     var points = Points.OrderBy(p => p.Date).ToList();
     var lo = points.Min(p => p.Value);
@@ -69,8 +66,6 @@ else
 
     /// <summary>Start the y-axis at zero (right for money, misleading for a metric that hovers around 7).</summary>
     [Parameter] public bool ZeroBased { get; set; }
-
-    [Parameter] public string EmptyText { get; set; } = "Not enough data yet.";
 
     /// <summary>Read out by screen readers in place of the picture.</summary>
     [Parameter, EditorRequired] public string AriaLabel { get; set; } = "";
