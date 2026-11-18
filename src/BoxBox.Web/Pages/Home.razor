@@ -13,12 +13,18 @@ else if (summary is null || entries is null || forecast is null)
 }
 else
 {
+    <ForecastCard Forecast="forecast" />
     <PriceCard Summary="summary" Entries="entries" />
     <LitresCard Summary="summary" />
-    <AddEntryForm OnSaved="Load" />
-    <ForecastCard Forecast="forecast" />
     <HistoryList Entries="entries" OnDelete="Delete" />
     <ImportBox OnImported="Load" />
+
+    @* Always within thumb reach; opens the popup. *@
+    <button type="button" class="fab" @ref="addButton" @onclick="OpenAdd">+ Add fill-up</button>
+
+    <Modal IsOpen="addOpen" Title="Add fill-up" OnClose="CloseAdd">
+        <AddEntryForm OnSaved="Saved" />
+    </Modal>
 }
 
 @code {
@@ -26,6 +32,8 @@ else
     private List<EntryDto>? entries;
     private ForecastResult? forecast;
     private string? error;
+    private bool addOpen;
+    private ElementReference addButton;
 
     // Lifecycle method: Blazor calls this once when the page first appears.
     protected override Task OnInitializedAsync() => Load();
@@ -46,6 +54,22 @@ else
         {
             error = "Could not reach the server. Is Tailscale on and the host awake?";
         }
+    }
+
+    private void OpenAdd() => addOpen = true;
+
+    private async Task CloseAdd()
+    {
+        addOpen = false;
+        await addButton.FocusAsync(); // hand keyboard focus back to the button that opened the popup
+    }
+
+    // The form reports a successful save: close the popup and refresh every card.
+    private async Task Saved()
+    {
+        addOpen = false;
+        await Load();
+        await addButton.FocusAsync();
     }
 
     private async Task Delete(Guid id)

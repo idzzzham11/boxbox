@@ -1,0 +1,47 @@
+@* A reusable popup. The parent owns whether it is open (IsOpen) and is told when the user wants it closed (OnClose):
+   "parameters down, events up" again. When closed it renders nothing at all. *@
+@if (IsOpen)
+{
+    @* Tapping the dark backdrop closes it; Escape closes it too (key events bubble up from anything focused inside). *@
+    <div class="backdrop" @onclick="Close" @onkeydown="OnKeyDown">
+        @* stopPropagation: a click inside the panel must not reach the backdrop's handler above. *@
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1"
+             @ref="panel" @onclick:stopPropagation>
+            <div class="modal-head">
+                <h2 id="modal-title">@Title</h2>
+                <button type="button" class="link" aria-label="Close" @onclick="Close">✕</button>
+            </div>
+            @ChildContent
+        </div>
+    </div>
+}
+
+@code {
+    private ElementReference panel;
+    private bool focusPending;
+
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private bool wasOpen;
+
+    protected override void OnParametersSet()
+    {
+        // Move keyboard focus into the dialog right after it appears.
+        focusPending = IsOpen && !wasOpen;
+        wasOpen = IsOpen;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!focusPending) return;
+        focusPending = false;
+        await panel.FocusAsync();
+    }
+
+    private Task Close() => OnClose.InvokeAsync();
+
+    private Task OnKeyDown(KeyboardEventArgs e) => e.Key == "Escape" ? Close() : Task.CompletedTask;
+}

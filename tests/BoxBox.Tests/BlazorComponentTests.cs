@@ -78,14 +78,14 @@ public class BlazorComponentTests : BunitContext
     {
         Backend();
         var cut = Render<Home>();
-        cut.WaitForState(() => cut.FindAll("section.card").Count >= 6, TimeSpan.FromSeconds(5));
+        cut.WaitForState(() => cut.FindAll("section.card").Count >= 5, TimeSpan.FromSeconds(5));
 
         var text = cut.Markup;
         Assert.Contains("<h2>Price</h2>", text);
         Assert.Contains("<h2>Litres</h2>", text);
         Assert.Contains("<h2>Forecast</h2>", text);
         Assert.Contains("<h3>Spending by month</h3>", text);   // now inside the Price card
-        Assert.Equal(6, cut.FindAll("section.card").Count);
+        Assert.Equal(5, cut.FindAll("section.card").Count);   // Forecast, Price, Litres, History, Import
         Assert.True(cut.FindAll("svg.chart").Count >= 1);
         Assert.Contains("<h2>History</h2>", text);
         Assert.Contains("12 fill-ups", text);                  // total card
@@ -241,4 +241,77 @@ public class BlazorComponentTests : BunitContext
         Assert.Contains("width:100.0%", rows[1].InnerHtml);   // October is the max
         Assert.Contains("width:25.0%", rows[0].InnerHtml);    // November = 50/200
     }
+
+    // ---- Layout: forecast first, add form in a popup ----
+
+    [Fact]
+    public void Forecast_card_comes_first_then_price_then_litres()
+    {
+        Backend();
+        var cut = Render<Home>();
+        cut.WaitForState(() => cut.FindAll("section.card").Count >= 5, TimeSpan.FromSeconds(5));
+        var headings = cut.FindAll("section.card > h2").Select(h => h.TextContent).ToList();
+        Assert.Equal(["Forecast", "Price", "Litres", "History"], headings.Take(4));
+    }
+
+    [Fact]
+    public void The_add_form_is_hidden_until_the_button_is_pressed()
+    {
+        Backend();
+        var cut = Render<Home>();
+        cut.WaitForState(() => cut.FindAll("button.fab").Count == 1, TimeSpan.FromSeconds(5));
+        Assert.Empty(cut.FindAll("form"));
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.Contains("Add fill-up", cut.Find("button.fab").TextContent);
+    }
+
+    [Fact]
+    public async Task Pressing_the_button_opens_the_popup_with_the_form()
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        Backend();
+        var cut = Render<Home>();
+        cut.WaitForState(() => cut.FindAll("button.fab").Count == 1, TimeSpan.FromSeconds(5));
+
+        await cut.Find("button.fab").ClickAsync();
+
+        var dialog = cut.Find("[role=dialog]");
+        Assert.Contains("Add fill-up", dialog.QuerySelector("h2")!.TextContent);
+        Assert.Contains("Paid (RM)", dialog.InnerHtml);
+        Assert.NotNull(dialog.QuerySelector("form"));
+    }
+
+    [Fact]
+    public async Task Saving_in_the_popup_posts_closes_the_popup_and_refreshes_the_page()
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        var handler = Backend(custom: r => r.Method == HttpMethod.Post ? (HttpStatusCode.Created, "{}") : null);
+        var cut = Render<Home>();
+        cut.WaitForState(() => cut.FindAll("button.fab").Count == 1, TimeSpan.FromSeconds(5));
+        var summaryCallsBefore = handler.Requests.Count(r => r.Path == "/api/summary");
+
+        await cut.Find("button.fab").ClickAsync();
+        cut.Find(".modal input").Change("45.50");
+        await cut.Find(".modal form").SubmitAsync();
+
+        cut.WaitForState(() => cut.FindAll("[role=dialog]").Count == 0, TimeSpan.FromSeconds(5));
+        Assert.Single(handler.Requests, r => r.Method == HttpMethod.Post && r.Path == "/api/entries");
+        cut.WaitForState(() => handler.Requests.Count(r => r.Path == "/api/summary") > summaryCallsBefore, TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task Closing_the_popup_with_the_cross_sends_nothing()
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        var handler = Backend();
+        var cut = Render<Home>();
+        cut.WaitForState(() => cut.FindAll("button.fab").Count == 1, TimeSpan.FromSeconds(5));
+
+        await cut.Find("button.fab").ClickAsync();
+        await cut.Find("button[aria-label=Close]").ClickAsync();
+
+        Assert.Empty(cut.FindAll("[role=dialog]"));
+        Assert.DoesNotContain(handler.Requests, r => r.Method == HttpMethod.Post);
+    }
 }
+

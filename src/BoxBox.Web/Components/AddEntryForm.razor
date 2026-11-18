@@ -1,29 +1,27 @@
 @inject BoxBoxApi Api
 
-<section class="card">
-    <h2>Add fill-up</h2>
-    @* EditForm binds inputs to a C# object (Model) and validates it using the attributes on the class below. *@
-    <EditForm Model="model" OnValidSubmit="Save" FormName="add-entry" class="form">
-        <DataAnnotationsValidator />
-        <label>Paid (RM)
-            <InputNumber @bind-Value="model.Amount" inputmode="decimal" step="0.01" />
-        </label>
-        <label>Litres <small>(optional)</small>
-            <InputNumber @bind-Value="model.Litres" inputmode="decimal" step="0.01" placeholder="auto from RM" />
-        </label>
-        <label>Trip km since last fill
-            <InputNumber @bind-Value="model.TripKm" inputmode="numeric" step="1" placeholder="trip meter" />
-        </label>
-        <label>Date
-            <InputDate @bind-Value="model.Date" />
-        </label>
-        <button class="full" type="submit" disabled="@saving">@(saving ? "Saving…" : "Save")</button>
-        <div class="msg full" role="status">
-            <ValidationSummary />
-            @message
-        </div>
-    </EditForm>
-</section>
+@* The form on its own: the page shows it inside a Modal. *@
+@* EditForm binds inputs to a C# object (Model) and validates it using the attributes on the class below. *@
+<EditForm Model="model" OnValidSubmit="Save" FormName="add-entry" class="form">
+    <DataAnnotationsValidator />
+    <label>Paid (RM)
+        <InputNumber @bind-Value="model.Amount" inputmode="decimal" step="0.01" />
+    </label>
+    <label>Litres <small>(optional)</small>
+        <InputNumber @bind-Value="model.Litres" inputmode="decimal" step="0.01" placeholder="auto from RM" />
+    </label>
+    <label>Trip km since last fill
+        <InputNumber @bind-Value="model.TripKm" inputmode="numeric" step="1" placeholder="trip meter" />
+    </label>
+    <label>Date
+        <InputDate @bind-Value="model.Date" />
+    </label>
+    <button class="full" type="submit" disabled="@saving">@(saving ? "Saving…" : "Save")</button>
+    <div class="msg full" role="status">
+        <ValidationSummary />
+        @message
+    </div>
+</EditForm>
 
 @code {
     private FormModel model = new();

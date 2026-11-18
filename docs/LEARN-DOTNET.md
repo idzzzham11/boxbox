@@ -77,6 +77,9 @@ Key ideas, each with an example:
 - **Services and DI in the browser:** `Services/BoxBoxApi.cs`, registered in `Program.cs`, injected with `@inject`.
 - **JavaScript interop:** `HistoryList.razor` calls the browser's `confirm()` dialog.
 
+- **A reusable popup:** `Components/Modal.razor` takes `IsOpen` and `OnClose` from its parent and shows whatever
+  `ChildContent` it is given. It shows `@onclick:stopPropagation` (a click inside must not reach the backdrop),
+  Escape handling, and moving focus into the dialog. `Pages/Home.razor` opens it from a floating button.
 - **Charts without a library:** `Components/LineChart.razor` draws an SVG from C#. The maths (nice axis ticks,
   mapping values to pixels) lives in `ChartScale.cs` as plain functions with unit tests in `ChartTests.cs`, so
   the visual part stays thin. `SvgLabel.razor` exists because Razor reserves the tag name `<text>`; a good example
