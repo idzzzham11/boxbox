@@ -331,5 +331,18 @@ public class BlazorComponentTests : BunitContext
         Assert.Empty(cut.FindAll("[role=dialog]"));
         Assert.DoesNotContain(handler.Requests, r => r.Method == HttpMethod.Post);
     }
+
+    [Fact]
+    public void The_app_does_not_move_keyboard_focus_to_the_heading_on_load()
+    {
+        // Blazor's FocusOnNavigate would focus the <h1> and Safari draws a blue focus ring around it.
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        Backend();
+        var cut = Render<BoxBox.Web.App>();
+        cut.WaitForState(() => cut.FindAll("section.card").Count >= 5, TimeSpan.FromSeconds(5));
+
+        Assert.DoesNotContain(JSInterop.Invocations, i => i.Identifier.Contains("focusBySelector"));
+        Assert.Null(cut.Find("h1").GetAttribute("tabindex"));
+    }
 }
 
