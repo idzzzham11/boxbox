@@ -1,8 +1,11 @@
 <section class="card">
     <h2>Litres</h2>
     <div class="stats">
-        <Stat Value="@(Summary.TotalLitres is { } l ? Fmt.Litres(l) : "—")"
-              Label="@(Summary.EstimatedLitresEntries > 0 ? $"Total litres · {Summary.EstimatedLitresEntries} estimated" : "Total litres")" />
+        @* The same four figures as the Price card, in litres. *@
+        <Stat Value="@(Summary.ThisMonthLitres is { } t ? Fmt.Litres(t) : "—")" Label="This month" />
+        <Stat Value="@(Summary.LastMonthLitres is { } m ? Fmt.Litres(m) : "—")" Label="Last month" />
+        <Stat Value="@(Summary.AverageMonthlyLitres is { } a ? Fmt.Litres(a) : "—")" Label="Avg / month" />
+        <Stat Value="@(Summary.TotalLitres is { } l ? Fmt.Litres(l) : "—")" Label="Total litres" />
         <Stat Value="@(Summary.AveragePricePerLitre is { } p ? Fmt.Rm(p) + "/L" : "—")" Label="Avg price per litre" />
 
         @if (Summary.Economy is { SegmentCount: > 0 } e)
@@ -18,6 +21,11 @@
             <div class="stat full"><small>Enter the trip-meter km on each fill-up (filled to the pump's cut-off) to see fuel economy.</small></div>
         }
     </div>
+
+    @if (Summary.EstimatedLitresEntries > 0)
+    {
+        <p class="note">@Summary.EstimatedLitresEntries of @Summary.EntryCount fill-ups have estimated litres, calculated from the amount paid at the set price. Enter real litres to replace an estimate.</p>
+    }
 
     <h3>Fuel economy per tank (L/100km)</h3>
     <LineChart Points="EconomyPoints"

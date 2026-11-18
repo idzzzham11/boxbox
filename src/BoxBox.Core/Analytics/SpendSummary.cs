@@ -2,7 +2,8 @@ using BoxBox.Core.Models;
 
 namespace BoxBox.Core.Analytics;
 
-public sealed record MonthSpend(int Year, int Month, decimal Total, int Count);
+/// <summary>One calendar month. Litres are recorded plus estimated; null when no entry that month has litres.</summary>
+public sealed record MonthSpend(int Year, int Month, decimal Total, int Count, decimal? Litres = null);
 
 public sealed record SpendSummaryResult(
     decimal TotalSpent,
@@ -14,7 +15,10 @@ public sealed record SpendSummaryResult(
     decimal? TotalLitres,
     int EstimatedLitresEntries,
     IReadOnlyList<MonthSpend> Months,
-    FuelEconomyResult Economy);
+    FuelEconomyResult Economy,
+    decimal? ThisMonthLitres,
+    decimal? LastMonthLitres,
+    decimal? AverageMonthlyLitres);
 
 public static class SpendSummary
 {
@@ -26,7 +30,13 @@ public static class SpendSummary
         var months = list
             .GroupBy(e => (e.Date.Year, e.Date.Month))
             .OrderBy(g => g.Key.Year).ThenBy(g => g.Key.Month)
-            .Select(g => new MonthSpend(g.Key.Year, g.Key.Month, g.Sum(e => e.AmountPaid), g.Count()))
+            .Select(g =>
+            {
+                // Litres for the month: recorded ones plus estimates, or null if none are known.
+                var litres = g.Select(prices.Resolve).Where(r => r.Litres is > 0).Select(r => r.Litres!.Value).ToList();
+                return new MonthSpend(g.Key.Year, g.Key.Month, g.Sum(e => e.AmountPaid), g.Count(),
+                    litres.Count > 0 ? litres.Sum() : null);
+            })
             .ToList();
 
         var thisMonth = months.FirstOrDefault(m => m.Year == today.Year && m.Month == today.Month)?.Total ?? 0m;
@@ -36,6 +46,14 @@ public static class SpendSummary
         // Average over completed months only, so a half-finished month doesn't drag it down.
         var completed = months.Where(m => (m.Year, m.Month) != (today.Year, today.Month)).ToList();
         decimal? avgMonthly = completed.Count > 0 ? Math.Round(completed.Average(m => m.Total), 2) : null;
+
+        // Same three figures for litres. Completed months without any litres are skipped, not counted as zero.
+        var thisMonthLitres = months.FirstOrDefault(m => m.Year == today.Year && m.Month == today.Month)?.Litres;
+        var lastMonthLitres = months.FirstOrDefault(m => m.Year == prev.Year && m.Month == prev.Month)?.Litres;
+        var completedWithLitres = completed.Where(m => m.Litres is not null).ToList();
+        decimal? avgMonthlyLitres = completedWithLitres.Count > 0
+            ? Math.Round(completedWithLitres.Average(m => m.Litres!.Value), 1)
+            : null;
 
         // Average price uses only litres that were really recorded (receipts); estimated litres are
         // derived from a price, so using them here would be circular.
@@ -52,6 +70,7 @@ public static class SpendSummary
         return new SpendSummaryResult(
             list.Sum(e => e.AmountPaid), list.Count, thisMonth, lastMonth,
             avgMonthly, avgPrice, totalLitres, estimatedCount, months,
-            FuelEconomy.Compute(list, prices));
+            FuelEconomy.Compute(list, prices),
+            thisMonthLitres, lastMonthLitres, avgMonthlyLitres);
     }
 }

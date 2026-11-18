@@ -199,4 +199,53 @@ public class ChartComponentTests : BunitContext
         Assert.Empty(cut.FindAll("svg.chart"));
         Assert.Contains("second fill-up with trip km", cut.Markup);
     }
+
+    // ---- Litres card figures (same four as the Price card) ----
+
+    private static readonly FuelPriceSchedule Budi = new([new PricePeriod(new DateOnly(2025, 9, 30), 1.99m)]);
+    private static readonly DateOnly Today = new(2026, 11, 18);
+
+    private static List<string> StatValues(IRenderedComponent<LitresCard> cut) =>
+        cut.FindAll(".stat").Select(s => s.TextContent.Trim()).ToList();
+
+    [Fact]
+    public void Litres_card_shows_this_month_last_month_average_and_total()
+    {
+        var summary = SpendSummary.Compute([
+            new FuelEntry(Guid.NewGuid(), TestData.Car, new DateOnly(2026, 9, 10), 99.5m, 50m),
+            new FuelEntry(Guid.NewGuid(), TestData.Car, new DateOnly(2026, 10, 10), 59.7m, 30m),
+            new FuelEntry(Guid.NewGuid(), TestData.Car, new DateOnly(2026, 11, 10), 39.8m, 20m)], Today);
+        var cut = Render<LitresCard>(p => p.Add(x => x.Summary, summary));
+        var stats = StatValues(cut);
+
+        Assert.Contains(stats, s => s.StartsWith("20.0 L") && s.Contains("This month"));
+        Assert.Contains(stats, s => s.StartsWith("30.0 L") && s.Contains("Last month"));
+        Assert.Contains(stats, s => s.StartsWith("40.0 L") && s.Contains("Avg / month"));   // (50 + 30) / 2
+        Assert.Contains(stats, s => s.StartsWith("100.0 L") && s.Contains("Total litres"));
+    }
+
+    [Fact]
+    public void Litres_card_shows_dashes_when_no_litres_are_known()
+    {
+        var summary = SpendSummary.Compute([
+            new FuelEntry(Guid.NewGuid(), TestData.Car, new DateOnly(2026, 10, 10), 50m),
+            new FuelEntry(Guid.NewGuid(), TestData.Car, new DateOnly(2026, 11, 10), 40m)], Today); // no price schedule
+        var cut = Render<LitresCard>(p => p.Add(x => x.Summary, summary));
+        var stats = StatValues(cut);
+        Assert.Contains(stats, s => s.StartsWith("—") && s.Contains("This month"));
+        Assert.Contains(stats, s => s.StartsWith("—") && s.Contains("Total litres"));
+        Assert.DoesNotContain("estimated", cut.Markup);
+    }
+
+    [Fact]
+    public void Litres_card_notes_how_many_fill_ups_have_estimated_litres()
+    {
+        var summary = SpendSummary.Compute([
+            new FuelEntry(Guid.NewGuid(), TestData.Car, new DateOnly(2026, 10, 10), 50m),         // estimated
+            new FuelEntry(Guid.NewGuid(), TestData.Car, new DateOnly(2026, 11, 10), 60m, 28m)],   // recorded
+            Today, Budi);
+        var cut = Render<LitresCard>(p => p.Add(x => x.Summary, summary));
+        Assert.Contains("1 of 2 fill-ups have estimated litres", cut.Markup);
+    }
 }
+

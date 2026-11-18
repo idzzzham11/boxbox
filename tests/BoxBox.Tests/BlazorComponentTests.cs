@@ -89,7 +89,7 @@ public class BlazorComponentTests : BunitContext
         Assert.True(cut.FindAll("svg.chart").Count >= 1);
         Assert.Contains("<h2>History</h2>", text);
         Assert.Contains("12 fill-ups", text);                  // total card
-        Assert.Contains("12 estimated", text);                 // litres are all estimated in this sample
+        Assert.Contains("12 of 12 fill-ups have estimated litres", text.Replace("\n", " ").Replace("  ", " ")); // all estimated in this sample
         Assert.Contains("Low confidence", text.Replace("\n", " ").Replace("  ", " "));
     }
 

@@ -73,4 +73,45 @@ public class SpendSummaryTests
         Assert.NotEmpty(FuelEntryValidator.Validate(E("2026-11-18", 50, 0m), Today));
         Assert.NotEmpty(FuelEntryValidator.Validate(E("2026-11-19", 50), Today));
     }
+
+    private static readonly FuelPriceSchedule Budi = new([new PricePeriod(new DateOnly(2025, 9, 30), 1.99m)]);
+
+    [Fact]
+    public void Monthly_litres_mix_recorded_and_estimated()
+    {
+        var r = SpendSummary.Compute([
+            E("2026-10-02", 49.75m),            // estimated: 25.00 L
+            E("2026-10-20", 60m, 28m),          // recorded
+            E("2026-11-03", 39.8m)],            // estimated: 20.00 L
+            Today, Budi);
+        Assert.Equal(53.00m, r.LastMonthLitres);
+        Assert.Equal(20.00m, r.ThisMonthLitres);
+        Assert.Equal(53.0m, r.AverageMonthlyLitres);  // only October is complete
+        Assert.Equal(53.00m, r.Months[0].Litres);
+    }
+
+    [Fact]
+    public void Litres_are_null_when_nothing_is_known_not_zero()
+    {
+        var r = SpendSummary.Compute([E("2026-10-02", 50m), E("2026-11-03", 40m)], Today); // no price schedule, no litres
+        Assert.Null(r.ThisMonthLitres);
+        Assert.Null(r.LastMonthLitres);
+        Assert.Null(r.AverageMonthlyLitres);
+        Assert.All(r.Months, m => Assert.Null(m.Litres));
+    }
+
+    [Fact]
+    public void Average_monthly_litres_skips_months_without_litres_and_excludes_the_current_month()
+    {
+        var r = SpendSummary.Compute([
+            E("2026-08-05", 50m),               // amount only, and no price schedule is passed: litres unknown
+            E("2026-09-05", 100m, 40m),
+            E("2026-10-05", 80m, 30m),
+            E("2026-11-05", 99m, 99m)],         // current month: excluded from the average
+            Today);                              // no schedule: only the recorded ones count
+        Assert.Equal(35.0m, r.AverageMonthlyLitres);   // (40 + 30) / 2; August has no litres and is skipped
+        Assert.Equal(99m, r.ThisMonthLitres);
+        Assert.Equal(30m, r.LastMonthLitres);
+    }
 }
+
